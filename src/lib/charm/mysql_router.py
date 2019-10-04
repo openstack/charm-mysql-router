@@ -1,0 +1,290 @@
+# Copyright 2019 Canonicauh Ltd
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#  http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+import json
+import subprocess
+
+import charms_openstack.charm
+import charms_openstack.adapters
+
+import charms.reactive as reactive
+
+import charmhelpers.core as ch_core
+import charmhelpers.contrib.network.ip as ch_net_ip
+
+import charmhelpers.contrib.database.mysql as mysql
+
+
+MYSQLD_CNF = "/etc/mysql/mysql.conf.d/mysqld.cnf"
+
+# Flag Strings
+MYSQL_ROUTER_BOOTSTRAPPED = "charm.mysqlrouter.bootstrapped"
+MYSQL_ROUTER_STARTED = "charm.mysqlrouter.started"
+DB_ROUTER_AVAILABLE = "db-router.available"
+DB_ROUTER_PROXY_AVAILABLE = "db-router.available.proxy"
+
+
+@charms_openstack.adapters.config_property
+def db_router_address(cls):
+    return ch_net_ip.get_relation_ip("db-router")
+
+
+@charms_openstack.adapters.config_property
+def shared_db_address(cls):
+    # This is is a subordinate relation, we want mysql communication
+    # to run over localhost
+    # Alternatively: ch_net_ip.get_relation_ip("shared-db")
+    return "127.0.0.1"
+
+
+class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
+    """Charm class for the MySQLRouter charm."""
+    name = "mysqlrouter"
+    packages = ["mysql-router"]
+    release = "stein"
+    release_pkg = "mysql-router"
+    required_relations = ["db-router", "shared-db"]
+    source_config_key = "source"
+
+    # FIXME Can we have a non-systemd services?
+    # Create a systemd shim?
+    # services = ["mysqlrouter"]
+    services = []
+    # TODO Post bootstrap config management and restarts
+    restart_map = {}
+    # TODO Pick group owner
+    group = "mysql"
+
+    # For internal use with mysql.get_db_data
+    _unprefixed = "MRUP"
+
+    @property
+    def mysqlrouter_bin(self):
+        return "/usr/bin/mysqlrouter"
+
+    @property
+    def db_router_endpoint(self):
+        return reactive.relations.endpoint_from_flag("db-router.available")
+
+    @property
+    def db_prefix(self):
+        return "mysqlrouter"
+
+    @property
+    def db_router_user(self):
+        # The prefix will be prepended
+        return "{}user".format(self.db_prefix)
+
+    @property
+    def db_router_password(self):
+        return json.loads(
+            self.db_router_endpoint.password(prefix=self.db_prefix))
+
+    @property
+    def db_router_address(self):
+        """ My address """
+        return self.options.db_router_address
+
+    @property
+    def cluster_address(self):
+        """ Database Cluster Addresss """
+        return json.loads(self.db_router_endpoint.db_host())
+
+    @property
+    def shared_db_address(self):
+        """ My address """
+        return self.options.shared_db_address
+
+    @property
+    def mysqlrouter_dir(self):
+        return "/home/{}/mysqlrouter".format(self.options.system_user)
+
+    def install(self):
+        """Custom install function.
+        """
+
+        # TODO: charms.openstack should probably do this
+        # Need to configure source first
+        self.configure_source()
+        super().install()
+
+    def get_db_helper(self):
+
+        db_helper = mysql.MySQL8Helper(
+            rpasswdf_template="/var/lib/charm/{}/mysql.passwd"
+                              .format(ch_core.hookenv.service_name()),
+            upasswdf_template="/var/lib/charm/{}/mysql-{{}}.passwd"
+                              .format(ch_core.hookenv.service_name()),
+            user=self.db_router_user,
+            password=self.db_router_password,
+            host=self.cluster_address)
+        return db_helper
+
+    def states_to_check(self, required_relations=None):
+        """Custom state check function for charm specific state check needs.
+
+        """
+        states_to_check = super().states_to_check(required_relations)
+        states_to_check["charm"] = [
+            (MYSQL_ROUTER_BOOTSTRAPPED,
+             "waiting",
+             "MySQL-Router not yet bootstrapped"),
+            (MYSQL_ROUTER_STARTED,
+             "waiting",
+             "MySQL-Router not yet started"),
+            (DB_ROUTER_PROXY_AVAILABLE,
+             "waiting",
+             "Waiting for proxied DB creation from cluster")]
+
+        return states_to_check
+
+    def check_mysql_connection(self):
+        """Check if local instance of mysql is accessible.
+
+        Attempt a connection to the local instance of mysql to determine
+        if it is running and accessible.
+
+        :side effect: Uses get_db_helper to execute a connection to the DB.
+        :returns: boolean
+        """
+
+        m_helper = self.get_db_helper()
+        try:
+            m_helper.connect(self.db_router_user,
+                             self.db_router_password,
+                             self.shared_db_address)
+            return True
+        except mysql.MySQLdb._exceptions.OperationalError:
+            ch_core.hookenv.log("Could not connect to db", "DEBUG")
+            return False
+
+    def custom_assess_status_check(self):
+
+        # Start with default checks
+        for f in [self.check_if_paused,
+                  self.check_interfaces,
+                  self.check_mandatory_config]:
+            state, message = f()
+            if state is not None:
+                ch_core.hookenv.status_set(state, message)
+                return state, message
+
+        # We should not get here until there is a connection to the
+        # cluster (db-router available)
+        if not self.check_mysql_connection():
+            return "blocked", "Failed to connect to MySQL"
+
+        return None, None
+
+    def bootstrap_mysqlrouter(self):
+
+        cmd = [self.mysqlrouter_bin,
+               "--user", self.options.system_user,
+               "--bootstrap",
+               "{}:{}@{}".format(self.db_router_user,
+                                 self.db_router_password,
+                                 self.cluster_address),
+               "--directory", self.mysqlrouter_dir,
+               "--conf-use-sockets",
+               "--conf-base-port", str(self.options.base_port)]
+        try:
+            output = subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+            ch_core.hookenv.log(output, "DEBUG")
+        except subprocess.CalledProcessError as e:
+            ch_core.hookenv.log(
+                "Failed to bootstrap mysqlrouter: {}"
+                .format(e.output.decode("UTF-8")), "ERROR")
+            return
+        reactive.flags.set_flag(MYSQL_ROUTER_BOOTSTRAPPED)
+
+    def start_mysqlrouter(self):
+        cmd = ["{}/start.sh".format(self.mysqlrouter_dir)]
+        try:
+            proc = subprocess.Popen(
+                cmd, stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT, bufsize=1,
+                universal_newlines=True)
+            proc.wait()
+            ch_core.hookenv.log("MySQL router started", "DEBUG")
+        except subprocess.CalledProcessError as e:
+            ch_core.hookenv.log(
+                "Failed to start mysqlrouter: {}"
+                .format(e.output.decode("UTF-8")), "ERROR")
+            return
+        reactive.flags.set_flag(MYSQL_ROUTER_STARTED)
+
+    def stop_mysqlrouter(self):
+        cmd = ["{}/stop.sh".format(self.mysqlrouter_dir)]
+        try:
+            proc = subprocess.Popen(
+                cmd, stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT, bufsize=1,
+                universal_newlines=True)
+            proc.wait()
+            ch_core.hookenv.log("MySQL router stopped", "DEBUG")
+        except subprocess.CalledProcessError as e:
+            ch_core.hookenv.log(
+                "Failed to start mysqlrouter: {}"
+                .format(e.output.decode("UTF-8")), "ERROR")
+            return
+        reactive.flags.clear_flag(MYSQL_ROUTER_STARTED)
+
+    def restart_mysqlrouter(self):
+        self.stop_mysqlrouter()
+        self.start_mysqlrouter()
+
+    def proxy_db_and_user_requests(
+            self, receiving_interface, sending_interface):
+
+        # We can use receiving_interface.all_joined_units.received
+        # as this is a subordiante and there is only one unit related.
+        db_data = mysql.get_db_data(
+            dict(receiving_interface.all_joined_units.received),
+            unprefixed=self._unprefixed)
+
+        for prefix in db_data:
+            sending_interface.configure_proxy_db(
+                db_data[prefix].get("database"),
+                db_data[prefix].get("username"),
+                db_data[prefix].get("hostname"),
+                prefix=prefix)
+
+    def proxy_db_and_user_responses(
+            self, receiving_interface, sending_interface):
+
+        # This is a suborndinate relationship there is only ever one
+        unit = sending_interface.all_joined_units[0]
+
+        for prefix in receiving_interface.get_prefixes():
+
+            if prefix in self.db_prefix:
+                # Do not send the mysqlrouter credentials to the client
+                continue
+
+            _password = json.loads(
+                receiving_interface.password(prefix=prefix))
+            if ch_core.hookenv.local_unit() in (json.loads(
+                    receiving_interface.allowed_units(prefix=prefix))):
+                _allowed_hosts = unit.unit_name
+            else:
+                _allowed_hosts = None
+            if prefix in self._unprefixed:
+                prefix = None
+
+            sending_interface.set_db_connection_info(
+                unit.relation.relation_id,
+                self.shared_db_address,
+                _password,
+                _allowed_hosts,
+                prefix=prefix)

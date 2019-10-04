@@ -1,0 +1,11 @@
+charm_name: mysql-router
+configure:
+- zaza.openstack.charm_tests.keystone.setup.add_demo_user
+tests:
+# Validates DB connectivity
+- zaza.openstack.charm_tests.keystone.tests.AuthenticationAuthorizationTest
+dev_bundles:
+gate_bundles:
+- eoan
+smoke_bundles:
+- eoan
