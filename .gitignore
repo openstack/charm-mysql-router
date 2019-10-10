@@ -5,10 +5,3 @@
 build
 interfaces
 layers
-README.ex
-
-# Remove these 
-src/tests/mysqlsh.snap
-src/tests/bundles/overlays/local-charm-overlay.yaml.j2
-src/files
-manual-attach.sh
