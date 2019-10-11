@@ -71,56 +71,138 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
 
     @property
     def mysqlrouter_bin(self):
+        """Determine the path to the mysqlrouter binary.
+
+        :param self: Self
+        :type self: MySQLRouterCharm instance
+        :returns: Path to the binary
+        :rtype: str
+        """
         return "/usr/bin/mysqlrouter"
 
     @property
     def db_router_endpoint(self):
+        """Get the MySQL Router (db-router) interface.
+
+        :param self: Self
+        :type self: MySQLRouterCharm instance
+        :returns: db-router interface
+        :rtype: MySQLRouterRequires object
+        """
         return reactive.relations.endpoint_from_flag("db-router.available")
 
     @property
     def db_prefix(self):
+        """Determine the prefix to use on the db-router relation.
+
+        :param self: Self
+        :type self: MySQLRouterCharm instance
+        :returns: Prefix
+        :rtype: str
+        """
         return "mysqlrouter"
 
     @property
     def db_router_user(self):
-        # The prefix will be prepended
+        """Determine the username to access the MySQL InnoDB Cluster.
+
+        :param self: Self
+        :type self: MySQLRouterCharm instance
+        :returns: Username
+        :rtype: str
+        """
         return "{}user".format(self.db_prefix)
 
     @property
     def db_router_password(self):
+        """Determine the password for the MySQL InnoDB Cluster.
+
+        Using the MySQL Router Endpoint determine the password to access the
+        MySQL InnoDB Cluster.
+
+        :param self: Self
+        :type self: MySQLRouterCharm instance
+        :returns: Password
+        :rtype: str
+        """
         return json.loads(
             self.db_router_endpoint.password(prefix=self.db_prefix))
 
     @property
     def db_router_address(self):
-        """ My address """
+        """Determine this unit's DB-Router address.
+
+        Using the class method determine this unit's address for the DB-Router
+        relation.
+
+        :param self: Self
+        :type self: MySQLRouterCharm instance
+        :returns: Address
+        :rtype: str
+        """
         return self.options.db_router_address
 
     @property
     def cluster_address(self):
-        """ Database Cluster Addresss """
+        """Determine MySQL InnoDB Cluster's address.
+
+        Using the MySQL Router Endpoint determine the MySQL InnoDB Cluster's
+        address.
+
+        :param self: Self
+        :type self: MySQLRouterCharm instance
+        :returns: Address
+        :rtype: str
+        """
         return json.loads(self.db_router_endpoint.db_host())
 
     @property
     def shared_db_address(self):
-        """ My address """
+        """Determine this unit's Shared-DB address.
+
+        Using the class method determine this unit's address for the Shared-DB
+        relation.
+
+        :param self: Self
+        :type self: MySQLRouterCharm instance
+        :returns: Address
+        :rtype: str
+        """
         return self.options.shared_db_address
 
     @property
     def mysqlrouter_dir(self):
+        """Determine the path to the mysqlrouter working directory.
+
+        :param self: Self
+        :type self: MySQLRouterCharm instance
+        :returns: Path to the directory
+        :rtype: str
+        """
         return "/home/{}/mysqlrouter".format(self.options.system_user)
 
     def install(self):
         """Custom install function.
-        """
 
+        :param self: Self
+        :type self: MySQLRouterCharm instance
+        :side effect: Executes other functions
+        :returns: This function is called for its side effect
+        :rtype: None
+        """
         # TODO: charms.openstack should probably do this
         # Need to configure source first
         self.configure_source()
         super().install()
 
     def get_db_helper(self):
+        """Get an instance of the MySQLDB8Helper class.
 
+        :param self: Self
+        :type self: MySQLRouterCharm instance
+        :returns: Instance of MySQLDB8Helper class
+        :rtype: MySQLDB8Helper instance
+        """
         db_helper = mysql.MySQL8Helper(
             rpasswdf_template="/var/lib/charm/{}/mysql.passwd"
                               .format(ch_core.hookenv.service_name()),
@@ -132,17 +214,28 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
         return db_helper
 
     def states_to_check(self, required_relations=None):
-        """Custom state check function for charm specific state check needs.
+        """Custom states to check function.
 
+        Construct a custom set of connected and available states for each
+        of the relations passed, along with error messages and new status
+        conditions.
+
+        :param self: Self
+        :type self: MySQLRouterCharm instance
+        :param required_relations: List of relations which overrides
+                                   self.relations
+        :type required_relations: list of strings
+        :returns: {relation: [(state, err_status, err_msg), (...),]}
+        :rtype: dict
         """
         states_to_check = super().states_to_check(required_relations)
         states_to_check["charm"] = [
             (MYSQL_ROUTER_BOOTSTRAPPED,
              "waiting",
-             "MySQL-Router not yet bootstrapped"),
+             "MySQL Router not yet bootstrapped"),
             (MYSQL_ROUTER_STARTED,
              "waiting",
-             "MySQL-Router not yet started"),
+             "MySQL Router not yet started"),
             (DB_ROUTER_PROXY_AVAILABLE,
              "waiting",
              "Waiting for proxied DB creation from cluster")]
@@ -150,15 +243,15 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
         return states_to_check
 
     def check_mysql_connection(self):
-        """Check if local instance of mysql is accessible.
+        """Check if an instance of MySQL is accessible.
 
-        Attempt a connection to the local instance of mysql to determine
-        if it is running and accessible.
+        Attempt a connection to the given instance of mysql to determine if it
+        is running and accessible.
 
         :side effect: Uses get_db_helper to execute a connection to the DB.
-        :returns: boolean
+        :returns: True if connection succeeds or False if not
+        :rtype: boolean
         """
-
         m_helper = self.get_db_helper()
         try:
             m_helper.connect(self.db_router_user,
@@ -170,7 +263,19 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
             return False
 
     def custom_assess_status_check(self):
+        """Custom assess status check.
 
+        Custom assess status check that validates connectivity to this unit's
+        MySQL instance.
+
+        Returns tuple of (sate, message), if there is a problem to report to
+        status output, or (None, None) if all is well.
+
+        :param self: Self
+        :type self: MySQLRouterCharm instance
+        :returns: Either (state, message) or (None, None)
+        :rtype: Union[tuple(str, str), tuple(None, None)]
+        """
         # Start with default checks
         for f in [self.check_if_paused,
                   self.check_interfaces,
@@ -188,7 +293,19 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
         return None, None
 
     def bootstrap_mysqlrouter(self):
+        """Bootstrap MySQL Router.
 
+        Execute the mysqlrouter bootstrap command. MySQL Router bootstraps into
+        a working directory information it gathers from the MySQL InnoDB
+        Cluster about the cluster's schema. Configuration and working files
+        live in self.mysqlrouter_bin.
+
+        :param self: Self
+        :type self: MySQLRouterCharm instance
+        :side effect: Executes the mysqlrouter bootstrap command
+        :returns: This function is called for its side effect
+        :rtype: None
+        """
         cmd = [self.mysqlrouter_bin,
                "--user", self.options.system_user,
                "--bootstrap",
@@ -209,6 +326,16 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
         reactive.flags.set_flag(MYSQL_ROUTER_BOOTSTRAPPED)
 
     def start_mysqlrouter(self):
+        """Start MySQL Router.
+
+        Start up the mysqlrouter daemon via the start script.
+
+        :param self: Self
+        :type self: MySQLRouterCharm instance
+        :side effect: Executes the mysqlrouter start script
+        :returns: This function is called for its side effect
+        :rtype: None
+        """
         cmd = ["{}/start.sh".format(self.mysqlrouter_dir)]
         try:
             proc = subprocess.Popen(
@@ -225,6 +352,16 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
         reactive.flags.set_flag(MYSQL_ROUTER_STARTED)
 
     def stop_mysqlrouter(self):
+        """Stop MySQL Router.
+
+        Stop the mysqlrouter daemon via the stop script.
+
+        :param self: Self
+        :type self: MySQLRouterCharm instance
+        :side effect: Executes the mysqlrouter stop script
+        :returns: This function is called for its side effect
+        :rtype: None
+        """
         cmd = ["{}/stop.sh".format(self.mysqlrouter_dir)]
         try:
             proc = subprocess.Popen(
@@ -241,12 +378,37 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
         reactive.flags.clear_flag(MYSQL_ROUTER_STARTED)
 
     def restart_mysqlrouter(self):
+        """Restart MySQL Router.
+
+        Restart the mysqlrouter daemon by calling self.stop_mysqlrouter and
+        self.start_mysqlrouter.
+
+        :param self: Self
+        :type self: MySQLRouterCharm instance
+        :side effect: Executes other functions
+        :returns: This function is called for its side effect
+        :rtype: None
+        """
         self.stop_mysqlrouter()
         self.start_mysqlrouter()
 
     def proxy_db_and_user_requests(
             self, receiving_interface, sending_interface):
+        """Proxy database and user requests to the MySQL InnoDB Cluster.
 
+        Take requests from the shared-db relation and proxy them to the
+        db-router relation using their respective endpoints.
+
+        :param self: Self
+        :type self: MySQLRouterCharm instance
+        :param receiving_interface: Shared-DB interface
+        :type receiving_interface: MySQLSharedProvides object
+        :param sending_interface: DB-Router interface
+        :type sending_interface: MySQLRouterRequires object
+        :side effect: Executes sending interface's set function
+        :returns: This function is called for its side effect
+        :rtype: None
+        """
         # We can use receiving_interface.all_joined_units.received
         # as this is a subordiante and there is only one unit related.
         db_data = mysql.get_db_data(
@@ -262,7 +424,21 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
 
     def proxy_db_and_user_responses(
             self, receiving_interface, sending_interface):
+        """Proxy database and user responses to clients.
 
+        Take responses from the db-router relation and proxy them to the
+        shared-db relation using their respective endpoints.
+
+        :param self: Self
+        :type self: MySQLRouterCharm instance
+        :param receiving_interface: DB-Router interface
+        :type receiving_interface: MySQLRouterRequires object
+        :param sending_interface: Shared-DB interface
+        :type sending_interface: MySQLSharedProvides object
+        :side effect: Executes sending interface's set function
+        :returns: This function is called for its side effect
+        :rtype: None
+        """
         # This is a suborndinate relationship there is only ever one
         unit = sending_interface.all_joined_units[0]
 
