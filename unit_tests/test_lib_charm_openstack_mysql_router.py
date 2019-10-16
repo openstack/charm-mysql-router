@@ -420,10 +420,9 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
     def test_proxy_db_and_user_requests_no_prefix(self):
         mrc = mysql_router.MySQLRouterCharm()
         mrc.proxy_db_and_user_requests(self.keystone_shared_db, self.db_router)
-        _calls = [mock.call('keystone', 'keystone',
-                  self.keystone_unit_ip,
-                  prefix=mrc._unprefixed)]
-        self.db_router.configure_proxy_db.assert_has_calls(_calls)
+        self.db_router.configure_proxy_db.assert_called_once_with(
+            'keystone', 'keystone', self.keystone_unit_ip,
+            prefix=mrc._unprefixed)
 
     def test_proxy_db_and_user_requests_prefixed(self):
         mrc = mysql_router.MySQLRouterCharm()
@@ -434,7 +433,8 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
                       prefix="novaapi"),
             mock.call('nova_cell0', 'nova', self.nova_unit_ip,
                       prefix="novacell0")]
-        self.db_router.configure_proxy_db.assert_has_calls(_calls)
+        self.db_router.configure_proxy_db.assert_has_calls(
+            _calls, any_order=True)
 
     def test_proxy_db_and_user_responses_unprefixed(self):
         _json_pass = '"pass"'
@@ -499,7 +499,8 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
                 self.nova_shared_db.relation_id, mrc.shared_db_address, _pass,
                 None, prefix=_novacell0),
         ]
-        self.nova_shared_db.set_db_connection_info.assert_has_calls(_calls)
+        self.nova_shared_db.set_db_connection_info.assert_has_calls(
+            _calls, any_order=True)
 
         # Allowed Units set correctly
         self.nova_shared_db.set_db_connection_info.reset_mock()
@@ -518,7 +519,8 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
                 self.nova_shared_db.relation_id, mrc.shared_db_address, _pass,
                 self.nova_unit_name, prefix=_novacell0),
         ]
-        self.nova_shared_db.set_db_connection_info.assert_has_calls(_calls)
+        self.nova_shared_db.set_db_connection_info.assert_has_calls(
+            _calls, any_order=True)
 
         # Confirm msyqlrouter credentials are not sent over the shared-db
         # relation

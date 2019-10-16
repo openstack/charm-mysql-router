@@ -6,7 +6,7 @@ options:
   basic:
     use_venv: True
     packages: [ 'libmysqlclient-dev']
-repo: https://github.com/openstack-charmers/charm-mysql-router
+repo: https://opendev.org/openstack/charm-mysql-router
 config:
   deletes:
     - verbose
