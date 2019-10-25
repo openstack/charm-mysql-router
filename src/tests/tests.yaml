@@ -1,11 +1,13 @@
 charm_name: mysql-router
 configure:
 - zaza.openstack.charm_tests.keystone.setup.add_demo_user
+- full_model:
+    - zaza.openstack.charm_tests.glance.setup.add_lts_image
 tests:
-# Validates DB connectivity
 - zaza.openstack.charm_tests.keystone.tests.AuthenticationAuthorizationTest
 dev_bundles:
 gate_bundles:
 - eoan
+- full_model: eoan-full-ha
 smoke_bundles:
 - eoan

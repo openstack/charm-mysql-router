@@ -9,8 +9,6 @@ applications:
     series: eoan
     charm: cs:~openstack-charmers-next/mysql-innodb-cluster
     num_units: 3
-    options:
-      source: distro-proposed
   keystone:
     series: eoan
     charm: cs:~openstack-charmers-next/keystone
