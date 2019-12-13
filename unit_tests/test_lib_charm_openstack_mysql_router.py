@@ -61,6 +61,7 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
 
     def setUp(self):
         super().setUp()
+        self.patch_object(mysql_router, "os")
         self.patch_object(mysql_router, "subprocess")
         self.patch_object(mysql_router.reactive.flags, "set_flag")
         self.patch_object(mysql_router.reactive.flags, "clear_flag")
@@ -68,6 +69,11 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
             mysql_router.reactive.relations, "endpoint_from_flag")
         self.patch_object(mysql_router.ch_net_ip, "get_relation_ip")
         self.patch_object(mysql_router.ch_core.hookenv, "local_unit")
+        self.patch_object(mysql_router.ch_core.host, "adduser")
+        self.patch_object(mysql_router.ch_core.host, "add_group")
+        self.patch_object(mysql_router.ch_core.host, "user_exists")
+        self.patch_object(mysql_router.ch_core.host, "group_exists")
+        self.patch_object(mysql_router.ch_core.host, "mkdir")
 
         self.stdout = mock.MagicMock()
         self.subprocess.STDOUT = self.stdout
@@ -210,23 +216,48 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
             mrc.shared_db_address,
             "127.0.0.1")
 
-    def test_mysqlrouter_dir(self):
-        _user = "ubuntu"
+    def test_mysqlrouter_working_dir(self):
         mrc = mysql_router.MySQLRouterCharm()
-        mrc.options.system_user = _user
         self.assertEqual(
-            mrc.mysqlrouter_dir,
-            "/home/{}/mysqlrouter".format(_user))
+            mrc.mysqlrouter_working_dir,
+            "/var/lib/mysql/mysqlrouter")
+
+    def test_mysqlrouter_home_dir(self):
+        mrc = mysql_router.MySQLRouterCharm()
+        self.assertEqual(
+            mrc.mysqlrouter_home_dir,
+            "/var/lib/mysql")
+
+    def test_mysqlrouter_group(self):
+        mrc = mysql_router.MySQLRouterCharm()
+        self.assertEqual(
+            mrc.mysqlrouter_group,
+            "mysql")
+
+    def test_mysqlrouter_user(self):
+        mrc = mysql_router.MySQLRouterCharm()
+        self.assertEqual(
+            mrc.mysqlrouter_user,
+            "mysql")
 
     def test_install(self):
         self.patch_object(
             mysql_router.charms_openstack.charm.OpenStackCharm,
             "install", "super_install")
+        self.os.path.exists.return_value = False
+        self.group_exists.return_value = False
+        self.user_exists.return_value = False
         mrc = mysql_router.MySQLRouterCharm()
         mrc.configure_source = mock.MagicMock()
         mrc.install()
         self.super_install.assert_called_once()
         mrc.configure_source.assert_called_once()
+        self.add_group.assert_called_once_with("mysql", system_group=True)
+        self.adduser.assert_called_once_with(
+            "mysql", home_dir="/var/lib/mysql", primary_group="mysql",
+            shell="/usr/sbin/nologin", system_user=True)
+        self.mkdir.assert_called_once_with(
+            "/var/lib/mysql", group="mysql", owner="mysql", perms=0o755)
 
     def test_get_db_helper(self):
         self.patch_object(
@@ -325,7 +356,7 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
         _json_pass = '"clusterpass"'
         _pass = json.loads(_json_pass)
         _addr = json.loads(_json_addr)
-        _user = "ubuntu"
+        _user = "mysql"
         _port = "3006"
         self.endpoint_from_flag.return_value = self.db_router
         self.db_router.password.return_value = _json_pass
@@ -340,7 +371,7 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
         self.subprocess.check_output.assert_called_once_with(
             [mrc.mysqlrouter_bin, "--user", _user, "--bootstrap",
              "{}:{}@{}".format(mrc.db_router_user, _pass, _addr),
-             "--directory", mrc.mysqlrouter_dir, "--conf-use-sockets",
+             "--directory", mrc.mysqlrouter_working_dir, "--conf-use-sockets",
              "--conf-base-port", _port],
             stderr=self.stdout)
         self.set_flag.assert_called_once_with(
@@ -356,7 +387,7 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
         self.set_flag.assert_not_called()
 
     def test_start_mysqlrouter(self):
-        _user = "ubuntu"
+        _user = "mysql"
         _port = "3006"
         mrc = mysql_router.MySQLRouterCharm()
         mrc.options.system_user = _user
@@ -365,7 +396,7 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
         # Successful
         mrc.start_mysqlrouter()
         self.subprocess.Popen.assert_called_once_with(
-            ["/home/ubuntu/mysqlrouter/start.sh"],
+            ["/var/lib/mysql/mysqlrouter/start.sh"],
             bufsize=1,
             stdout=self.stdout,
             stderr=self.stdout,
@@ -391,7 +422,7 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
         # Successful
         mrc.stop_mysqlrouter()
         self.subprocess.Popen.assert_called_once_with(
-            ["/home/ubuntu/mysqlrouter/stop.sh"],
+            ["/var/lib/mysql/mysqlrouter/stop.sh"],
             bufsize=1,
             stdout=self.stdout,
             stderr=self.stdout,

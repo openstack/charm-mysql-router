@@ -14,11 +14,6 @@ options:
       .
       See https://wiki.ubuntu.com/OpenStack/CloudArchive for info on which
       cloud archives are available and supported.
-  system-user:
-    # TODO What user? No mysql user exists. Create one?
-    type: string
-    description: System user to run mysqlrouter
-    default: ubuntu
   base-port:
     type: int
     default: 3306

@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import json
+import os
 import subprocess
 
 import charms_openstack.charm
@@ -171,7 +172,7 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
         return self.options.shared_db_address
 
     @property
-    def mysqlrouter_dir(self):
+    def mysqlrouter_working_dir(self):
         """Determine the path to the mysqlrouter working directory.
 
         :param self: Self
@@ -179,7 +180,26 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
         :returns: Path to the directory
         :rtype: str
         """
-        return "/home/{}/mysqlrouter".format(self.options.system_user)
+        return "{}/mysqlrouter".format(self.mysqlrouter_home_dir)
+
+    @property
+    def mysqlrouter_home_dir(self):
+        """Determine the path to the mysqlrouter working directory.
+
+        :param self: Self
+        :type self: MySQLRouterCharm instance
+        :returns: Path to the directory
+        :rtype: str
+        """
+        return "/var/lib/mysql"
+
+    @property
+    def mysqlrouter_user(self):
+        return "mysql"
+
+    @property
+    def mysqlrouter_group(self):
+        return "mysql"
 
     def install(self):
         """Custom install function.
@@ -194,6 +214,27 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
         # Need to configure source first
         self.configure_source()
         super().install()
+
+        # Neither MySQL Router nor MySQL common packaging creates a user, group
+        # or home dir. As we want it to run as a system user in a predictable
+        # location create all of these.
+        # Create the group
+        if not ch_core.host.group_exists(self.mysqlrouter_group):
+            ch_core.host.add_group(
+                self.mysqlrouter_group, system_group=True)
+        # Create the user
+        if not ch_core.host.user_exists(self.mysqlrouter_user):
+            ch_core.host.adduser(
+                self.mysqlrouter_user, shell="/usr/sbin/nologin",
+                system_user=True, primary_group=self.mysqlrouter_group,
+                home_dir=self.mysqlrouter_home_dir)
+        # Create the directory
+        if not os.path.exists(self.mysqlrouter_home_dir):
+            ch_core.host.mkdir(
+                self.mysqlrouter_home_dir,
+                owner=self.mysqlrouter_user,
+                group=self.mysqlrouter_group,
+                perms=0o755)
 
     def get_db_helper(self):
         """Get an instance of the MySQLDB8Helper class.
@@ -307,12 +348,12 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
         :rtype: None
         """
         cmd = [self.mysqlrouter_bin,
-               "--user", self.options.system_user,
+               "--user", self.mysqlrouter_user,
                "--bootstrap",
                "{}:{}@{}".format(self.db_router_user,
                                  self.db_router_password,
                                  self.cluster_address),
-               "--directory", self.mysqlrouter_dir,
+               "--directory", self.mysqlrouter_working_dir,
                "--conf-use-sockets",
                "--conf-base-port", str(self.options.base_port)]
         try:
@@ -336,7 +377,7 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
         :returns: This function is called for its side effect
         :rtype: None
         """
-        cmd = ["{}/start.sh".format(self.mysqlrouter_dir)]
+        cmd = ["{}/start.sh".format(self.mysqlrouter_working_dir)]
         try:
             proc = subprocess.Popen(
                 cmd, stdout=subprocess.PIPE,
@@ -362,7 +403,7 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
         :returns: This function is called for its side effect
         :rtype: None
         """
-        cmd = ["{}/stop.sh".format(self.mysqlrouter_dir)]
+        cmd = ["{}/stop.sh".format(self.mysqlrouter_working_dir)]
         try:
             proc = subprocess.Popen(
                 cmd, stdout=subprocess.PIPE,
