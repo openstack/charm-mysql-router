@@ -19,7 +19,7 @@ import mock
 
 import charms_openstack.test_utils as test_utils
 
-import charm.mysql_router as mysql_router
+import charm.openstack.mysql_router as mysql_router
 
 
 class TestMySQLRouterProperties(test_utils.PatchHelper):
@@ -244,6 +244,7 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
         self.patch_object(
             mysql_router.charms_openstack.charm.OpenStackCharm,
             "install", "super_install")
+        self.patch_object(mysql_router.shutil, "copy")
         self.os.path.exists.return_value = False
         self.group_exists.return_value = False
         self.user_exists.return_value = False
@@ -258,6 +259,11 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
             shell="/usr/sbin/nologin", system_user=True)
         self.mkdir.assert_called_once_with(
             "/var/lib/mysql", group="mysql", owner="mysql", perms=0o755)
+
+        self.copy.assert_called_once()
+        self.subprocess.check_output.assert_called_once_with(
+            ['/usr/bin/systemctl', 'enable', 'mysqlrouter'],
+            stderr=self.subprocess.STDOUT)
 
     def test_get_db_helper(self):
         self.patch_object(
@@ -387,66 +393,27 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
         self.set_flag.assert_not_called()
 
     def test_start_mysqlrouter(self):
-        _user = "mysql"
-        _port = "3006"
+        self.patch_object(mysql_router.ch_core.host, "service_start")
         mrc = mysql_router.MySQLRouterCharm()
-        mrc.options.system_user = _user
-        mrc.options.base_port = _port
 
-        # Successful
         mrc.start_mysqlrouter()
-        self.subprocess.Popen.assert_called_once_with(
-            ["/var/lib/mysql/mysqlrouter/start.sh"],
-            bufsize=1,
-            stdout=self.stdout,
-            stderr=self.stdout,
-            universal_newlines=True)
+        self.service_start.assert_called_once_with("mysqlrouter")
         self.set_flag.assert_called_once_with(
             mysql_router.MYSQL_ROUTER_STARTED)
 
-        # Fail
-        self.subprocess.reset_mock()
-        self.set_flag.reset_mock()
-        self.subprocess.CalledProcessError = FakeException
-        self.subprocess.Popen.side_effect = self.subprocess.CalledProcessError
-        mrc.start_mysqlrouter()
-        self.set_flag.assert_not_called()
-
     def test_stop_mysqlrouter(self):
-        _user = "ubuntu"
-        _port = "3306"
+        self.patch_object(mysql_router.ch_core.host, "service_stop")
         mrc = mysql_router.MySQLRouterCharm()
-        mrc.options.system_user = _user
-        mrc.options.base_port = _port
 
-        # Successful
         mrc.stop_mysqlrouter()
-        self.subprocess.Popen.assert_called_once_with(
-            ["/var/lib/mysql/mysqlrouter/stop.sh"],
-            bufsize=1,
-            stdout=self.stdout,
-            stderr=self.stdout,
-            universal_newlines=True)
-
-        self.clear_flag.assert_called_once_with(
-            mysql_router.MYSQL_ROUTER_STARTED)
-
-        # Fail
-        self.subprocess.reset_mock()
-        self.clear_flag.reset_mock()
-        self.subprocess.CalledProcessError = FakeException
-        self.subprocess.Popen.side_effect = self.subprocess.CalledProcessError
-        mrc.stop_mysqlrouter()
-        self.clear_flag.assert_not_called()
+        self.service_stop.assert_called_once_with("mysqlrouter")
 
     def test_restart_mysqlrouter(self):
         mrc = mysql_router.MySQLRouterCharm()
-        mrc.stop_mysqlrouter = mock.MagicMock()
-        mrc.start_mysqlrouter = mock.MagicMock()
+        self.patch_object(mysql_router.ch_core.host, "service_restart")
 
         mrc.restart_mysqlrouter()
-        mrc.stop_mysqlrouter.assert_called_once()
-        mrc.start_mysqlrouter.assert_called_once()
+        self.service_restart.assert_called_once_with("mysqlrouter")
 
     def test_proxy_db_and_user_requests_no_prefix(self):
         mrc = mysql_router.MySQLRouterCharm()

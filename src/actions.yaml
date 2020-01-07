@@ -1,0 +1,9 @@
+stop-mysqlrouter:
+  description: |
+    Stop the mysqlrouter daemon
+start-mysqlrouter:
+  description: |
+    Start the mysqlrouter daemon
+restart-mysqlrouter:
+  description: |
+    Restart the mysqlrouter daemon

@@ -1,0 +1,15 @@
+# MySQL Router systemd service file
+
+[Unit]
+Description=MySQL Router
+After=network.target
+
+[Service]
+Type=exec
+ExecStart=/var/lib/mysql/mysqlrouter/start.sh
+ExecStop=/var/lib/mysql/mysqlrouter/stop.sh
+RemainAfterExit=yes
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

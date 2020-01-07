@@ -14,7 +14,7 @@
 
 import mock
 
-import charm.mysql_router as mysql_router
+import charm.openstack.mysql_router as mysql_router
 import reactive.mysql_router_handlers as handlers
 
 import charms_openstack.test_utils as test_utils

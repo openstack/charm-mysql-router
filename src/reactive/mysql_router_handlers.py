@@ -3,7 +3,7 @@ import charms.reactive as reactive
 import charms_openstack.bus
 import charms_openstack.charm as charm
 
-import charm.mysql_router as mysql_router  # noqa
+import charm.openstack.mysql_router as mysql_router  # noqa
 
 charms_openstack.bus.discover()
 

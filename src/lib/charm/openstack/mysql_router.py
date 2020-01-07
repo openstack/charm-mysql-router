@@ -14,6 +14,7 @@
 
 import json
 import os
+import shutil
 import subprocess
 
 import charms_openstack.charm
@@ -27,7 +28,7 @@ import charmhelpers.contrib.network.ip as ch_net_ip
 import charmhelpers.contrib.database.mysql as mysql
 
 
-MYSQLD_CNF = "/etc/mysql/mysql.conf.d/mysqld.cnf"
+MYSQLROUTER_CNF = "/var/lib/mysql/mysqlrouter/mysqlrouter.conf"
 
 # Flag Strings
 MYSQL_ROUTER_BOOTSTRAPPED = "charm.mysqlrouter.bootstrapped"
@@ -58,12 +59,10 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
     required_relations = ["db-router", "shared-db"]
     source_config_key = "source"
 
-    # FIXME Can we have a non-systemd services?
-    # Create a systemd shim?
-    # services = ["mysqlrouter"]
-    services = []
-    # TODO Post bootstrap config management and restarts
-    restart_map = {}
+    services = ["mysqlrouter"]
+    restart_map = {
+        MYSQLROUTER_CNF: services,
+    }
     # TODO Pick group owner
     group = "mysql"
 
@@ -236,6 +235,15 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
                 group=self.mysqlrouter_group,
                 perms=0o755)
 
+        # Systemd File
+        _systemd_filename = "mysqlrouter.service"
+        _src_systemd = os.path.join(
+            ch_core.hookenv.charm_dir(), "files", _systemd_filename)
+        _dst_systemd = os.path.join("/etc/systemd/system", _systemd_filename)
+        shutil.copy(_src_systemd, _dst_systemd)
+        cmd = ["/usr/bin/systemctl", "enable", "mysqlrouter"]
+        subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
     def get_db_helper(self):
         """Get an instance of the MySQLDB8Helper class.
 
@@ -377,19 +385,7 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
         :returns: This function is called for its side effect
         :rtype: None
         """
-        cmd = ["{}/start.sh".format(self.mysqlrouter_working_dir)]
-        try:
-            proc = subprocess.Popen(
-                cmd, stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT, bufsize=1,
-                universal_newlines=True)
-            proc.wait()
-            ch_core.hookenv.log("MySQL router started", "DEBUG")
-        except subprocess.CalledProcessError as e:
-            ch_core.hookenv.log(
-                "Failed to start mysqlrouter: {}"
-                .format(e.output.decode("UTF-8")), "ERROR")
-            return
+        ch_core.host.service_start("mysqlrouter")
         reactive.flags.set_flag(MYSQL_ROUTER_STARTED)
 
     def stop_mysqlrouter(self):
@@ -403,20 +399,7 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
         :returns: This function is called for its side effect
         :rtype: None
         """
-        cmd = ["{}/stop.sh".format(self.mysqlrouter_working_dir)]
-        try:
-            proc = subprocess.Popen(
-                cmd, stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT, bufsize=1,
-                universal_newlines=True)
-            proc.wait()
-            ch_core.hookenv.log("MySQL router stopped", "DEBUG")
-        except subprocess.CalledProcessError as e:
-            ch_core.hookenv.log(
-                "Failed to start mysqlrouter: {}"
-                .format(e.output.decode("UTF-8")), "ERROR")
-            return
-        reactive.flags.clear_flag(MYSQL_ROUTER_STARTED)
+        ch_core.host.service_stop("mysqlrouter")
 
     def restart_mysqlrouter(self):
         """Restart MySQL Router.
@@ -430,8 +413,7 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
         :returns: This function is called for its side effect
         :rtype: None
         """
-        self.stop_mysqlrouter()
-        self.start_mysqlrouter()
+        ch_core.host.service_restart("mysqlrouter")
 
     def proxy_db_and_user_requests(
             self, receiving_interface, sending_interface):
