@@ -7,9 +7,9 @@ applications:
     charm: ../../../mysql-router
   mysql-innodb-cluster:
     series: eoan
-    charm: cs:~openstack-charmers-next/mysql-innodb-cluster
+    charm: cs:mysql-innodb-cluster
     num_units: 3
   keystone:
     series: eoan
-    charm: cs:~openstack-charmers-next/keystone
+    charm: cs:keystone
     num_units: 1
