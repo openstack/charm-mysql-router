@@ -473,6 +473,11 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
 
             _password = json.loads(
                 receiving_interface.password(prefix=prefix))
+
+            # Wait timeout is an optional setting
+            _wait_timeout = receiving_interface.wait_timeout()
+            if _wait_timeout:
+                _wait_timeout = json.loads(_wait_timeout)
             if ch_core.hookenv.local_unit() in (json.loads(
                     receiving_interface.allowed_units(prefix=prefix))):
                 _allowed_hosts = unit.unit_name
@@ -485,5 +490,6 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
                 unit.relation.relation_id,
                 self.shared_db_address,
                 _password,
-                _allowed_hosts,
-                prefix=prefix)
+                allowed_units=_allowed_hosts,
+                prefix=prefix,
+                wait_timeout=_wait_timeout)
