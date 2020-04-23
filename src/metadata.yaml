@@ -8,6 +8,7 @@ tags:
 subordinate: true
 series:
   - eoan
+  - focal
 provides:
   shared-db:
     interface: mysql-shared

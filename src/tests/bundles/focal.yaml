@@ -1,4 +1,4 @@
-series: eoan
+series: focal
 relations:
 - ["keystone:shared-db", "mysql-router:shared-db"]
 - ["mysql-router:db-router", "mysql-innodb-cluster:db-router"]
@@ -6,10 +6,9 @@ applications:
   mysql-router:
     charm: ../../../mysql-router
   mysql-innodb-cluster:
-    series: eoan
+    series: focal
     charm: cs:~openstack-charmers-next/mysql-innodb-cluster
     num_units: 3
   keystone:
-    series: eoan
     charm: cs:~openstack-charmers-next/keystone
     num_units: 1
