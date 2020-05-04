@@ -6,8 +6,8 @@ After=network.target
 
 [Service]
 Type=exec
-ExecStart=/var/lib/mysql/mysqlrouter/start.sh
-ExecStop=/var/lib/mysql/mysqlrouter/stop.sh
+ExecStart=/var/lib/mysql/{{ options.charm_instance.name }}/start.sh
+ExecStop=/var/lib/mysql/{{ options.charm_instance.name }}/stop.sh
 RemainAfterExit=yes
 Restart=on-failure
 

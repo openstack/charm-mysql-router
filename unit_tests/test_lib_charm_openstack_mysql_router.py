@@ -218,9 +218,11 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
 
     def test_mysqlrouter_working_dir(self):
         mrc = mysql_router.MySQLRouterCharm()
+        _name = "keystone-mysql-router"
+        mrc.name = _name
         self.assertEqual(
             mrc.mysqlrouter_working_dir,
-            "/var/lib/mysql/mysqlrouter")
+            "/var/lib/mysql/{}".format(_name))
 
     def test_mysqlrouter_home_dir(self):
         mrc = mysql_router.MySQLRouterCharm()
@@ -244,12 +246,14 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
         self.patch_object(
             mysql_router.charms_openstack.charm.OpenStackCharm,
             "install", "super_install")
-        self.patch_object(mysql_router.shutil, "copy")
+        _name = "keystone-mysql-router"
+        self.patch_object(mysql_router.ch_core.templating, "render")
         self.os.path.exists.return_value = False
         self.group_exists.return_value = False
         self.user_exists.return_value = False
         mrc = mysql_router.MySQLRouterCharm()
         mrc.configure_source = mock.MagicMock()
+        mrc.name = _name
         mrc.install()
         self.super_install.assert_called_once()
         mrc.configure_source.assert_called_once()
@@ -260,9 +264,9 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
         self.mkdir.assert_called_once_with(
             "/var/lib/mysql", group="mysql", owner="mysql", perms=0o755)
 
-        self.copy.assert_called_once()
+        self.render.assert_called_once()
         self.subprocess.check_output.assert_called_once_with(
-            ['/usr/bin/systemctl', 'enable', 'mysqlrouter'],
+            ['/usr/bin/systemctl', 'enable', _name],
             stderr=self.subprocess.STDOUT)
 
     def test_get_db_helper(self):
@@ -304,6 +308,7 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
         _pass = "clusterpass"
         _user = "mysqlrouteruser"
         _addr = "127.0.0.1"
+        _port = 3316
         self.endpoint_from_flag.return_value = self.db_router
         self.db_router.password.return_value = _json_pass
 
@@ -312,20 +317,21 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
         self._exceptions.OperationalError = Exception
         _helper = mock.MagicMock()
         mrc = mysql_router.MySQLRouterCharm()
+        mrc.options.base_port = _port
         mrc.get_db_helper = mock.MagicMock()
         mrc.get_db_helper.return_value = _helper
 
         # Connects
         self.assertTrue(mrc.check_mysql_connection())
         _helper.connect.assert_called_once_with(
-            _user, _pass, _addr)
+            _user, _pass, _addr, port=_port)
 
         # Fails
         _helper.reset_mock()
         _helper.connect.side_effect = self._exceptions.OperationalError
         self.assertFalse(mrc.check_mysql_connection())
         _helper.connect.assert_called_once_with(
-            _user, _pass, _addr)
+            _user, _pass, _addr, port=_port)
 
     def test_custom_assess_status_check(self):
         _check = mock.MagicMock()
@@ -394,26 +400,32 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
 
     def test_start_mysqlrouter(self):
         self.patch_object(mysql_router.ch_core.host, "service_start")
+        _name = "keystone-mysql-router"
         mrc = mysql_router.MySQLRouterCharm()
+        mrc.name = _name
 
         mrc.start_mysqlrouter()
-        self.service_start.assert_called_once_with("mysqlrouter")
+        self.service_start.assert_called_once_with(_name)
         self.set_flag.assert_called_once_with(
             mysql_router.MYSQL_ROUTER_STARTED)
 
     def test_stop_mysqlrouter(self):
+        _name = "keystone-mysql-router"
         self.patch_object(mysql_router.ch_core.host, "service_stop")
         mrc = mysql_router.MySQLRouterCharm()
+        mrc.name = _name
 
         mrc.stop_mysqlrouter()
-        self.service_stop.assert_called_once_with("mysqlrouter")
+        self.service_stop.assert_called_once_with(_name)
 
     def test_restart_mysqlrouter(self):
+        _name = "keystone-mysql-router"
         mrc = mysql_router.MySQLRouterCharm()
+        mrc.name = _name
         self.patch_object(mysql_router.ch_core.host, "service_restart")
 
         mrc.restart_mysqlrouter()
-        self.service_restart.assert_called_once_with("mysqlrouter")
+        self.service_restart.assert_called_once_with(_name)
 
     def test_proxy_db_and_user_requests_no_prefix(self):
         mrc = mysql_router.MySQLRouterCharm()
@@ -440,10 +452,12 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
         _json_pass = '"pass"'
         _pass = json.loads(_json_pass)
         _local_unit = "kmr/5"
+        _port = 3316
         self.db_router.password.return_value = _json_pass
         self.local_unit.return_value = _local_unit
 
         mrc = mysql_router.MySQLRouterCharm()
+        mrc.options.base_port = _port
         self.db_router.get_prefixes.return_value = [
             mrc._unprefixed, mrc.db_prefix]
 
@@ -455,7 +469,8 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
             self.db_router, self.keystone_shared_db)
         self.keystone_shared_db.set_db_connection_info.assert_called_once_with(
             self.keystone_shared_db.relation_id, mrc.shared_db_address,
-            _pass, allowed_units=None, prefix=None, wait_timeout=None)
+            _pass, allowed_units=None, prefix=None, wait_timeout=None,
+            db_port=_port)
 
         # Allowed Units and wait time set correctly
         self.db_router.wait_timeout.return_value = _json_wait_time
@@ -467,7 +482,7 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
         self.keystone_shared_db.set_db_connection_info.assert_called_once_with(
             self.keystone_shared_db.relation_id, mrc.shared_db_address,
             _pass, allowed_units=self.keystone_unit_name, prefix=None,
-            wait_timeout=_wait_time)
+            wait_timeout=_wait_time, db_port=_port)
 
         # Confirm msyqlrouter credentials are not sent over the shared-db
         # relation
@@ -483,10 +498,12 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
         _nova = "nova"
         _novaapi = "novaapi"
         _novacell0 = "novacell0"
+        _port = 3316
         self.db_router.password.return_value = _json_pass
         self.local_unit.return_value = _local_unit
 
         mrc = mysql_router.MySQLRouterCharm()
+        mrc.options.base_port = _port
         self.db_router.get_prefixes.return_value = [
             mrc.db_prefix, _nova, _novaapi, _novacell0]
 
@@ -498,15 +515,15 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
             mock.call(
                 self.nova_shared_db.relation_id, mrc.shared_db_address, _pass,
                 allowed_units=None, prefix=_nova,
-                wait_timeout=None),
+                wait_timeout=None, db_port=_port),
             mock.call(
                 self.nova_shared_db.relation_id, mrc.shared_db_address, _pass,
                 allowed_units=None, prefix=_novaapi,
-                wait_timeout=None),
+                wait_timeout=None, db_port=_port),
             mock.call(
                 self.nova_shared_db.relation_id, mrc.shared_db_address, _pass,
                 allowed_units=None, prefix=_novacell0,
-                wait_timeout=None),
+                wait_timeout=None, db_port=_port),
         ]
         self.nova_shared_db.set_db_connection_info.assert_has_calls(
             _calls, any_order=True)
@@ -520,15 +537,15 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
             mock.call(
                 self.nova_shared_db.relation_id, mrc.shared_db_address, _pass,
                 allowed_units=self.nova_unit_name, prefix=_nova,
-                wait_timeout=_wait_time),
+                wait_timeout=_wait_time, db_port=_port),
             mock.call(
                 self.nova_shared_db.relation_id, mrc.shared_db_address, _pass,
                 allowed_units=self.nova_unit_name, prefix=_novaapi,
-                wait_timeout=_wait_time),
+                wait_timeout=_wait_time, db_port=_port),
             mock.call(
                 self.nova_shared_db.relation_id, mrc.shared_db_address, _pass,
                 allowed_units=self.nova_unit_name, prefix=_novacell0,
-                wait_timeout=_wait_time),
+                wait_timeout=_wait_time, db_port=_port),
         ]
         self.nova_shared_db.set_db_connection_info.assert_has_calls(
             _calls, any_order=True)

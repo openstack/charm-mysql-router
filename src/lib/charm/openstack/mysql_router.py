@@ -14,7 +14,6 @@
 
 import json
 import os
-import shutil
 import subprocess
 
 import charms_openstack.charm
@@ -26,6 +25,8 @@ import charmhelpers.core as ch_core
 import charmhelpers.contrib.network.ip as ch_net_ip
 
 import charmhelpers.contrib.database.mysql as mysql
+
+import charmhelpers.contrib.openstack.templating as os_templating
 
 
 MYSQLROUTER_CNF = "/var/lib/mysql/mysqlrouter/mysqlrouter.conf"
@@ -52,14 +53,18 @@ def shared_db_address(cls):
 
 class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
     """Charm class for the MySQLRouter charm."""
-    name = "mysqlrouter"
+    name = ch_core.hookenv.service_name()
     packages = ["mysql-router"]
     release = "stein"
     release_pkg = "mysql-router"
     required_relations = ["db-router", "shared-db"]
     source_config_key = "source"
 
-    services = ["mysqlrouter"]
+    systemd_file = os.path.join(
+        "/etc/systemd/system",
+        "{}.service".format(name))
+
+    services = [name]
     restart_map = {
         MYSQLROUTER_CNF: services,
     }
@@ -171,6 +176,10 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
         return self.options.shared_db_address
 
     @property
+    def mysqlrouter_port(self):
+        return self.options.base_port
+
+    @property
     def mysqlrouter_working_dir(self):
         """Determine the path to the mysqlrouter working directory.
 
@@ -179,7 +188,7 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
         :returns: Path to the directory
         :rtype: str
         """
-        return "{}/mysqlrouter".format(self.mysqlrouter_home_dir)
+        return "{}/{}".format(self.mysqlrouter_home_dir, self.name)
 
     @property
     def mysqlrouter_home_dir(self):
@@ -236,12 +245,16 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
                 perms=0o755)
 
         # Systemd File
-        _systemd_filename = "mysqlrouter.service"
-        _src_systemd = os.path.join(
-            ch_core.hookenv.charm_dir(), "files", _systemd_filename)
-        _dst_systemd = os.path.join("/etc/systemd/system", _systemd_filename)
-        shutil.copy(_src_systemd, _dst_systemd)
-        cmd = ["/usr/bin/systemctl", "enable", "mysqlrouter"]
+        ch_core.templating.render(
+            source="mysqlrouter.service",
+            template_loader=os_templating.get_loader(
+                'templates/', self.release),
+            target=self.systemd_file,
+            context=self.adapters_instance,
+            group=self.group,
+            perms=0o755,
+        )
+        cmd = ["/usr/bin/systemctl", "enable", self.name]
         subprocess.check_output(cmd, stderr=subprocess.STDOUT)
 
     def get_db_helper(self):
@@ -305,7 +318,8 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
         try:
             m_helper.connect(self.db_router_user,
                              self.db_router_password,
-                             self.shared_db_address)
+                             self.shared_db_address,
+                             port=self.mysqlrouter_port)
             return True
         except mysql.MySQLdb._exceptions.OperationalError:
             ch_core.hookenv.log("Could not connect to db", "DEBUG")
@@ -363,7 +377,7 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
                                  self.cluster_address),
                "--directory", self.mysqlrouter_working_dir,
                "--conf-use-sockets",
-               "--conf-base-port", str(self.options.base_port)]
+               "--conf-base-port", str(self.mysqlrouter_port)]
         try:
             output = subprocess.check_output(cmd, stderr=subprocess.STDOUT)
             ch_core.hookenv.log(output, "DEBUG")
@@ -385,7 +399,7 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
         :returns: This function is called for its side effect
         :rtype: None
         """
-        ch_core.host.service_start("mysqlrouter")
+        ch_core.host.service_start(self.name)
         reactive.flags.set_flag(MYSQL_ROUTER_STARTED)
 
     def stop_mysqlrouter(self):
@@ -399,7 +413,7 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
         :returns: This function is called for its side effect
         :rtype: None
         """
-        ch_core.host.service_stop("mysqlrouter")
+        ch_core.host.service_stop(self.name)
 
     def restart_mysqlrouter(self):
         """Restart MySQL Router.
@@ -413,7 +427,7 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
         :returns: This function is called for its side effect
         :rtype: None
         """
-        ch_core.host.service_restart("mysqlrouter")
+        ch_core.host.service_restart(self.name)
 
     def proxy_db_and_user_requests(
             self, receiving_interface, sending_interface):
@@ -492,4 +506,5 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
                 _password,
                 allowed_units=_allowed_hosts,
                 prefix=prefix,
-                wait_timeout=_wait_timeout)
+                wait_timeout=_wait_timeout,
+                db_port=self.mysqlrouter_port)
