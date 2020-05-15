@@ -485,6 +485,13 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
                 # Do not send the mysqlrouter credentials to the client
                 continue
 
+            if not receiving_interface.password(prefix=prefix):
+                ch_core.hookenv.log(
+                    "Skipping proxy_db_and_user_responses as we have no "
+                    "relation data on a departing db-router relation. ",
+                    "WARNING")
+                return
+
             _password = json.loads(
                 receiving_interface.password(prefix=prefix))
 

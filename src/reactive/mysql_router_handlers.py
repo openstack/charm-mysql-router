@@ -31,6 +31,8 @@ def db_router_request(db_router):
             instance.db_router_user,
             instance.db_router_address,
             prefix=instance.db_prefix)
+        # Reset on scale in
+        db_router.set_or_clear_available()
         instance.assess_status()
 
 
