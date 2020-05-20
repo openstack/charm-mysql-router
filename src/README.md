@@ -1,62 +1,83 @@
 # Overview
 
-This charm provides a MySQL 8 Router. The charm proxies database requests from
-the principle application charm to a MySQL 8 InnoDB Cluster. MySQL Router
-handles cluster communication and understands the cluster schema.
+The mysql-router charm provides a [MySQL 8 Router][upstream-mysql8-router]; it
+proxies database requests from a principle application to a MySQL 8 InnoDB
+Cluster. MySQL Router handles cluster communication and understands the cluster
+schema.
 
-Ubuntu 19.10 or above is required.
+It is a subordinate charm that is used in conjunction with the
+[mysql-innodb-cluster][mysql-innodb-cluster-charm] charm. It is also used with
+a principle charm that supports the 'mysql-shared' interface. The current list
+of such charms can be obtained from the [Charm
+Store][charms-requires-mysql-shared] (the charms officially supported by the
+OpenStack Charms project are published by 'openstack-charmers').
+
+> **Important**: The eoan series is the first series supported by the
+  mysql-innodb-cluster and mysql-router charms. These charms replace the
+  [percona-cluster][percona-cluster-charm] charm starting with the focal
+  series.
 
 # Usage
 
-The charm is intended to be deployed as a subordinate charm on the
-application server and related to the mysql-innodb-cluster charm.
+The charm is deployed as a subordinate to a principle application and then
+related to the central mysql-innodb-cluster application:
 
-## Cluster deployment
+    principle charm A <---> mysql-router A <--->
+    principle charm B <---> mysql-router B <---> mysql-innodb-cluster
+    principle charm C <---> mysql-router C <--->
 
-```
-juju deploy mysql-router
-```
+## Configuration
 
-The charm is related to a principle application charm via the
-[shared-db relation](https://github.com/openstack/charm-interface-mysql-shared):
+See file `config.yaml` for the full list of configuration options, along with
+their descriptions and default values.
 
-```
-juju add-relation keystone:shared-db mysql-router:shared-db
-```
+## Deployment
 
-The charm is then related to the [MySQL 8 InnoDB cluster charm](https://github.com/openstack-charmers/charm-mysql-innodb-cluster) via the
-[db-router relation](https://github.com/openstack-charmers/charm-interface-mysql-router):
+To deploy a MySQL 8 Router:
 
-```
-juju add-relation msyql-router:db-router mysql-innodb-cluster:db-router
-```
+    juju deploy mysql-router
 
-## Scale out Usage
+Add a relation to a principle application (via the [shared-db][shared-db]
+endpoint):
 
-Scale out is accomplished by adding units to the principle charm:
+    juju add-relation keystone:shared-db mysql-router:shared-db
 
-```
-juju add-unit keystone
-```
+Then add a relation to the mysql-innodb-cluster application (via the
+[db-router][db-router] endpoint):
 
-## Known Limitations and Issues
+    juju add-relation msyql-router:db-router mysql-innodb-cluster:db-router
 
-> **Warning**: This charm is in preview state.
+Scale out is accomplished by adding units to the principle application:
 
-The charm is under active development and is not yet production ready. Its
-current intended use is for validation of MySQL 8 InnoDB cluster for use with
-OpenStack.
+    juju add-unit keystone
 
-# Contact Information
+## Actions
 
-OpenStack Charmers <openstack-charmers@lists.ubuntu.com>
+This section lists Juju [actions][juju-docs-actions] supported by the charm.
+Actions allow specific operations to be performed on a per-unit basis. To
+display action descriptions run `juju actions mysql-router`. If the
+charm is not deployed then see file `actions.yaml`.
 
-## Upstream MySQL
-
-  - [Upstream documentation](https://dev.mysql.com/doc/mysql-router/8.0/en/)
+* `stop-mysqlrouter`
+* `start-mysqlrouter`
+* `restart-mysqlrouter`
 
 # Bugs
 
-Please report bugs on [Launchpad](https://bugs.launchpad.net/charm-mysql-router/+filebug).
+Please report bugs on [Launchpad][lp-bugs-charm-mysql-router].
 
-For general questions please refer to the OpenStack [Charm Guide](https://docs.openstack.org/charm-guide/latest/).
+For general charm questions refer to the [OpenStack Charm Guide][cg].
+
+<!-- LINKS -->
+
+[cg]: https://docs.openstack.org/charm-guide
+[lp-bugs-charm-mysql-router]: https://bugs.launchpad.net/charm-mysql-router/+filebug
+[juju-docs-actions]: https://jaas.ai/docs/actions
+[percona-cluster-charm]: https://jaas.ai/percona-cluster
+[mysql-router-charm]: https://jaas.ai/mysql-router
+[mysql-innodb-cluster-charm]: https://jaas.ai/mysql-innodb-cluster
+[upstream-mysql8-router]: https://dev.mysql.com/doc/mysql-router/8.0/en/
+[db-router]: https://github.com/openstack-charmers/charm-interface-mysql-router
+[shared-db]: https://github.com/openstack/charm-interface-mysql-shared
+[cdg-app-ha-mysql8]: https://docs.openstack.org/project-deploy-guide/charm-deployment-guide/latest/app-ha.html#mysql-8
+[charms-requires-mysql-shared]: https://jaas.ai/search?requires=mysql-shared
