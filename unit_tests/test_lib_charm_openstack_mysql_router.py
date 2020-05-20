@@ -554,3 +554,13 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
         # relation
         for call in self.nova_shared_db.set_db_connection_info.mock_calls:
             self.assertNotEqual(mrc.db_prefix, call.kwargs.get("prefix"))
+
+    def test_proxy_db_and_user_responses_no_data(self):
+        self.db_router.password.return_value = None
+
+        mrc = mysql_router.MySQLRouterCharm()
+        self.db_router.get_prefixes.return_value = [
+            mrc._unprefixed, mrc.db_prefix]
+        mrc.proxy_db_and_user_responses(
+            self.db_router, self.keystone_shared_db)
+        self.keystone_shared_db.set_db_connection_info.assert_not_called()

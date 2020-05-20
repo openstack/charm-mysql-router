@@ -1,10 +1,6 @@
 charm_name: mysql-router
 configure:
 - zaza.openstack.charm_tests.keystone.setup.add_demo_user
-- eoan_full_model:
-    - zaza.openstack.charm_tests.glance.setup.add_lts_image
-    - zaza.openstack.charm_tests.nova.setup.create_flavors
-    - zaza.openstack.charm_tests.keystone.setup.add_demo_user
 - focal_full_model:
     - zaza.openstack.charm_tests.vault.setup.auto_initialize
     - zaza.openstack.charm_tests.glance.setup.add_lts_image
@@ -14,14 +10,11 @@ configure:
     - zaza.openstack.charm_tests.keystone.setup.add_demo_user
 tests:
 - zaza.openstack.charm_tests.keystone.tests.AuthenticationAuthorizationTest
-- eoan_full_model:
-    - zaza.openstack.charm_tests.keystone.tests.AuthenticationAuthorizationTest
 - focal_full_model:
     - zaza.openstack.charm_tests.keystone.tests.AuthenticationAuthorizationTest
 dev_bundles:
 gate_bundles:
 - focal_full_model: focal-full-ha
-- eoan_full_model: eoan-full-ha
 smoke_bundles:
 - focal
 tests_options:
