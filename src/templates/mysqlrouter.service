@@ -10,6 +10,7 @@ ExecStart=/var/lib/mysql/{{ options.charm_instance.name }}/start.sh
 ExecStop=/var/lib/mysql/{{ options.charm_instance.name }}/stop.sh
 RemainAfterExit=yes
 Restart=on-failure
+LimitNOFILE=65535
 
 [Install]
 WantedBy=multi-user.target
