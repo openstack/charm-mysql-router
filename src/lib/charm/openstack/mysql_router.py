@@ -377,6 +377,7 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
                                  self.cluster_address),
                "--directory", self.mysqlrouter_working_dir,
                "--conf-use-sockets",
+               "--conf-bind-address", self.shared_db_address,
                "--conf-base-port", str(self.mysqlrouter_port)]
         try:
             output = subprocess.check_output(cmd, stderr=subprocess.STDOUT)
