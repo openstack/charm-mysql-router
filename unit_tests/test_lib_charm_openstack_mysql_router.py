@@ -384,6 +384,7 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
             [mrc.mysqlrouter_bin, "--user", _user, "--bootstrap",
              "{}:{}@{}".format(mrc.db_router_user, _pass, _addr),
              "--directory", mrc.mysqlrouter_working_dir, "--conf-use-sockets",
+             "--conf-bind-address", mrc.shared_db_address,
              "--conf-base-port", _port],
             stderr=self.stdout)
         self.set_flag.assert_called_once_with(
