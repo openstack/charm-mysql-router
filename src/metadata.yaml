@@ -4,11 +4,12 @@ maintainer: OpenStack Charmers <openstack-charmers@lists.ubuntu.com>
 description: |
   MySQL Router proxying communication between application clients and MySQL InnoDB Clusters.
 tags:
-  - databases
+- databases
 subordinate: true
 series:
-  - eoan
-  - focal
+- eoan
+- focal
+- groovy
 provides:
   shared-db:
     interface: mysql-shared
