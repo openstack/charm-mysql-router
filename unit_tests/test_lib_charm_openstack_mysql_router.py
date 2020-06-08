@@ -15,7 +15,7 @@
 import copy
 import collections
 import json
-import mock
+from unittest import mock
 
 import charms_openstack.test_utils as test_utils
 
