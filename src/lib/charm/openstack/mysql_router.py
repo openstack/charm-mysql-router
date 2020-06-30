@@ -500,6 +500,10 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
             _wait_timeout = receiving_interface.wait_timeout()
             if _wait_timeout:
                 _wait_timeout = json.loads(_wait_timeout)
+            # SSL CA is an optional setting
+            _ssl_ca = receiving_interface.ssl_ca()
+            if _ssl_ca:
+                _ssl_ca = json.loads(_ssl_ca)
             if ch_core.hookenv.local_unit() in (json.loads(
                     receiving_interface.allowed_units(prefix=prefix))):
                 _allowed_hosts = unit.unit_name
@@ -515,4 +519,5 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
                 allowed_units=_allowed_hosts,
                 prefix=prefix,
                 wait_timeout=_wait_timeout,
-                db_port=self.mysqlrouter_port)
+                db_port=self.mysqlrouter_port,
+                ssl_ca=_ssl_ca)

@@ -452,6 +452,8 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
         _json_wait_time = "90"
         _json_pass = '"pass"'
         _pass = json.loads(_json_pass)
+        _json_ca = '"Certificate Authority"'
+        _ca = json.loads(_json_ca)
         _local_unit = "kmr/5"
         _port = 3316
         self.db_router.password.return_value = _json_pass
@@ -462,8 +464,9 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
         self.db_router.get_prefixes.return_value = [
             mrc._unprefixed, mrc.db_prefix]
 
-        # Allowed Units unset and wait_time unset
+        # Allowed Units,  wait_time and ssl_ca unset
         self.db_router.wait_timeout.return_value = None
+        self.db_router.ssl_ca.return_value = None
         self.db_router.allowed_units.return_value = '""'
 
         mrc.proxy_db_and_user_responses(
@@ -471,10 +474,11 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
         self.keystone_shared_db.set_db_connection_info.assert_called_once_with(
             self.keystone_shared_db.relation_id, mrc.shared_db_address,
             _pass, allowed_units=None, prefix=None, wait_timeout=None,
-            db_port=_port)
+            db_port=_port, ssl_ca=None)
 
         # Allowed Units and wait time set correctly
         self.db_router.wait_timeout.return_value = _json_wait_time
+        self.db_router.ssl_ca.return_value = _json_ca
         self.keystone_shared_db.set_db_connection_info.reset_mock()
         self.db_router.allowed_units.return_value = json.dumps(_local_unit)
         mrc.proxy_db_and_user_responses(
@@ -483,7 +487,7 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
         self.keystone_shared_db.set_db_connection_info.assert_called_once_with(
             self.keystone_shared_db.relation_id, mrc.shared_db_address,
             _pass, allowed_units=self.keystone_unit_name, prefix=None,
-            wait_timeout=_wait_time, db_port=_port)
+            wait_timeout=_wait_time, db_port=_port, ssl_ca=_ca)
 
         # Confirm msyqlrouter credentials are not sent over the shared-db
         # relation
@@ -495,6 +499,8 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
         _json_wait_time = "90"
         _json_pass = '"pass"'
         _pass = json.loads(_json_pass)
+        _json_ca = '"Certificate Authority"'
+        _ca = json.loads(_json_ca)
         _local_unit = "nmr/5"
         _nova = "nova"
         _novaapi = "novaapi"
@@ -508,29 +514,31 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
         self.db_router.get_prefixes.return_value = [
             mrc.db_prefix, _nova, _novaapi, _novacell0]
 
-        # Allowed Units and wait time unset
+        # Allowed Units,  wait time and CA unset
         self.db_router.wait_timeout.return_value = None
+        self.db_router.ssl_ca.return_value = None
         self.db_router.allowed_units.return_value = '""'
         mrc.proxy_db_and_user_responses(self.db_router, self.nova_shared_db)
         _calls = [
             mock.call(
                 self.nova_shared_db.relation_id, mrc.shared_db_address, _pass,
                 allowed_units=None, prefix=_nova,
-                wait_timeout=None, db_port=_port),
+                wait_timeout=None, db_port=_port, ssl_ca=None),
             mock.call(
                 self.nova_shared_db.relation_id, mrc.shared_db_address, _pass,
                 allowed_units=None, prefix=_novaapi,
-                wait_timeout=None, db_port=_port),
+                wait_timeout=None, db_port=_port, ssl_ca=None),
             mock.call(
                 self.nova_shared_db.relation_id, mrc.shared_db_address, _pass,
                 allowed_units=None, prefix=_novacell0,
-                wait_timeout=None, db_port=_port),
+                wait_timeout=None, db_port=_port, ssl_ca=None),
         ]
         self.nova_shared_db.set_db_connection_info.assert_has_calls(
             _calls, any_order=True)
 
         # Allowed Units and wait time set correctly
         self.db_router.wait_timeout.return_value = _json_wait_time
+        self.db_router.ssl_ca.return_value = _json_ca
         self.nova_shared_db.set_db_connection_info.reset_mock()
         self.db_router.allowed_units.return_value = json.dumps(_local_unit)
         mrc.proxy_db_and_user_responses(self.db_router, self.nova_shared_db)
@@ -538,15 +546,15 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
             mock.call(
                 self.nova_shared_db.relation_id, mrc.shared_db_address, _pass,
                 allowed_units=self.nova_unit_name, prefix=_nova,
-                wait_timeout=_wait_time, db_port=_port),
+                wait_timeout=_wait_time, db_port=_port, ssl_ca=_ca),
             mock.call(
                 self.nova_shared_db.relation_id, mrc.shared_db_address, _pass,
                 allowed_units=self.nova_unit_name, prefix=_novaapi,
-                wait_timeout=_wait_time, db_port=_port),
+                wait_timeout=_wait_time, db_port=_port, ssl_ca=_ca),
             mock.call(
                 self.nova_shared_db.relation_id, mrc.shared_db_address, _pass,
                 allowed_units=self.nova_unit_name, prefix=_novacell0,
-                wait_timeout=_wait_time, db_port=_port),
+                wait_timeout=_wait_time, db_port=_port, ssl_ca=_ca),
         ]
         self.nova_shared_db.set_db_connection_info.assert_has_calls(
             _calls, any_order=True)
