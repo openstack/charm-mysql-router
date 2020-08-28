@@ -477,8 +477,13 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
         :returns: This function is called for its side effect
         :rtype: None
         """
-        # This is a suborndinate relationship there is only ever one
-        unit = sending_interface.all_joined_units[0]
+        try:
+            # This is a subordinate relationship there is only ever one
+            unit = sending_interface.all_joined_units[0]
+        except IndexError:
+            # NOTE(lourot): this happens when the unit is departing, see
+            # lp:1881596. Let's just silently give up:
+            return
 
         for prefix in receiving_interface.get_prefixes():
 

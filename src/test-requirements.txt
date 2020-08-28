@@ -4,5 +4,6 @@
 #     https://github.com/openstack-charmers/release-tools
 #
 # Functional Test Requirements (let Zaza's dependencies solve all dependencies here!)
+setuptools<50.0.0  # https://github.com/pypa/setuptools/commit/04e3df22df840c6bb244e9b27bc56750c44b7c85
 git+https://github.com/openstack-charmers/zaza.git#egg=zaza
 git+https://github.com/openstack-charmers/zaza-openstack-tests.git#egg=zaza.openstack
