@@ -51,6 +51,10 @@ Scale out is accomplished by adding units to the principle application:
 
     juju add-unit keystone
 
+> **Note**: If more than one mysql-router application is placed on the same
+  machine the `base-port` configuration option is needed to ensure
+  non-conflicting TCP port numbers are used (the default is '3306').
+
 ## Actions
 
 This section lists Juju [actions][juju-docs-actions] supported by the charm.
