@@ -309,6 +309,7 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
         _user = "mysqlrouteruser"
         _addr = "127.0.0.1"
         _port = 3316
+        _connect_timeout = 30
         self.endpoint_from_flag.return_value = self.db_router
         self.db_router.password.return_value = _json_pass
 
@@ -324,14 +325,14 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
         # Connects
         self.assertTrue(mrc.check_mysql_connection())
         _helper.connect.assert_called_once_with(
-            _user, _pass, _addr, port=_port)
+            _user, _pass, _addr, port=_port, connect_timeout=_connect_timeout)
 
         # Fails
         _helper.reset_mock()
         _helper.connect.side_effect = self._exceptions.OperationalError
         self.assertFalse(mrc.check_mysql_connection())
         _helper.connect.assert_called_once_with(
-            _user, _pass, _addr, port=_port)
+            _user, _pass, _addr, port=_port, connect_timeout=_connect_timeout)
 
     def test_custom_assess_status_check(self):
         _check = mock.MagicMock()

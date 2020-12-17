@@ -59,6 +59,7 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
     release_pkg = "mysql-router"
     required_relations = ["db-router", "shared-db"]
     source_config_key = "source"
+    mysql_connect_timeout = 30
 
     systemd_file = os.path.join(
         "/etc/systemd/system",
@@ -319,7 +320,8 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
             m_helper.connect(self.db_router_user,
                              self.db_router_password,
                              self.shared_db_address,
-                             port=self.mysqlrouter_port)
+                             port=self.mysqlrouter_port,
+                             connect_timeout=self.mysql_connect_timeout)
             return True
         except mysql.MySQLdb._exceptions.OperationalError:
             ch_core.hookenv.log("Could not connect to db", "DEBUG")
