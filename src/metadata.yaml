@@ -7,7 +7,6 @@ tags:
 - databases
 subordinate: true
 series:
-- eoan
 - focal
 - groovy
 provides:
