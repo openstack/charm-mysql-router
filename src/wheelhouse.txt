@@ -2,3 +2,5 @@ psutil
 mysqlclient
 
 git+https://github.com/juju/charm-helpers.git#egg=charmhelpers
+
+git+https://opendev.org/openstack/charms.openstack.git#egg=charms.openstack
