@@ -13,11 +13,10 @@ tests:
 - full_model_ha:
     - zaza.openstack.charm_tests.keystone.tests.AuthenticationAuthorizationTest
     - zaza.openstack.charm_tests.hacluster.tests.HaclusterScalebackTest
-dev_bundles:
-- groovy
-- full_model_ha: groovy-full-ha
 gate_bundles:
 - full_model_ha: focal-full-ha
+- groovy
+- full_model_ha: groovy-full-ha
 smoke_bundles:
 - focal
 tests_options:
