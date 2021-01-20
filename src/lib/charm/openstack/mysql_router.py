@@ -381,6 +381,10 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
                "--conf-use-sockets",
                "--conf-bind-address", self.shared_db_address,
                "--conf-base-port", str(self.mysqlrouter_port)]
+        # Avoid multiple routers trying to bind to the same api port
+        # Bug #1911907
+        if ch_core.host.cmp_pkgrevno('mysql-router', '8.0.22') >= 0:
+            cmd.append("--disable-rest")
         try:
             output = subprocess.check_output(cmd, stderr=subprocess.STDOUT)
             ch_core.hookenv.log(output, "DEBUG")

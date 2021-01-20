@@ -74,6 +74,7 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
         self.patch_object(mysql_router.ch_core.host, "user_exists")
         self.patch_object(mysql_router.ch_core.host, "group_exists")
         self.patch_object(mysql_router.ch_core.host, "mkdir")
+        self.patch_object(mysql_router.ch_core.host, "cmp_pkgrevno")
 
         self.stdout = mock.MagicMock()
         self.subprocess.STDOUT = self.stdout
@@ -379,14 +380,33 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
         mrc.options.system_user = _user
         mrc.options.base_port = _port
 
-        # Successful
+        # Successful < 8.0.22
+        self.cmp_pkgrevno.return_value = -1
         mrc.bootstrap_mysqlrouter()
         self.subprocess.check_output.assert_called_once_with(
             [mrc.mysqlrouter_bin, "--user", _user, "--bootstrap",
              "{}:{}@{}".format(mrc.db_router_user, _pass, _addr),
-             "--directory", mrc.mysqlrouter_working_dir, "--conf-use-sockets",
+             "--directory", mrc.mysqlrouter_working_dir,
+             "--conf-use-sockets",
              "--conf-bind-address", mrc.shared_db_address,
              "--conf-base-port", _port],
+            stderr=self.stdout)
+        self.set_flag.assert_called_once_with(
+            mysql_router.MYSQL_ROUTER_BOOTSTRAPPED)
+
+        # Successful >= 8.0.22
+        self.subprocess.reset_mock()
+        self.set_flag.reset_mock()
+        self.cmp_pkgrevno.return_value = 1
+        mrc.bootstrap_mysqlrouter()
+        self.subprocess.check_output.assert_called_once_with(
+            [mrc.mysqlrouter_bin, "--user", _user, "--bootstrap",
+             "{}:{}@{}".format(mrc.db_router_user, _pass, _addr),
+             "--directory", mrc.mysqlrouter_working_dir,
+             "--conf-use-sockets",
+             "--conf-bind-address", mrc.shared_db_address,
+             "--conf-base-port", _port,
+             "--disable-rest"],
             stderr=self.stdout)
         self.set_flag.assert_called_once_with(
             mysql_router.MYSQL_ROUTER_BOOTSTRAPPED)
