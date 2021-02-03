@@ -1,5 +1,6 @@
 charm_name: mysql-router
 configure:
+- zaza.openstack.charm_tests.vault.setup.auto_initialize
 - zaza.openstack.charm_tests.keystone.setup.add_demo_user
 - full_model_ha:
     - zaza.openstack.charm_tests.vault.setup.auto_initialize

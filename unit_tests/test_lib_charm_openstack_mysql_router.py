@@ -125,6 +125,9 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
         self.nova_shared_db.relations = {
             self.nova_shared_db.relation_id: self.nova_shared_db}
 
+        self.mock_open = mock.mock_open()
+        self.patch('builtins.open', new_callable=self.mock_open)
+
     def _fake_get_allowed_units(self, interface):
         return " ".join(
             [x.unit_name for x in
@@ -594,3 +597,16 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
         mrc.proxy_db_and_user_responses(
             self.db_router, self.keystone_shared_db)
         self.keystone_shared_db.set_db_connection_info.assert_not_called()
+
+    def test_update_config_parameter(self):
+        self.patch_object(mysql_router.configparser, "ConfigParser")
+
+        self.service_name = "mysql-router"
+        _mock_config_parser = mock.MagicMock()
+        self.ConfigParser.return_value = _mock_config_parser
+
+        mrc = mysql_router.MySQLRouterCharm()
+        mrc.update_config_parameter("DEFAULT", "client_ssl_mode", "PREFERRED")
+        _mock_config_parser.read.assert_called_once()
+        _mock_config_parser.write.assert_called_once_with(
+            self.mock_open()().__enter__())

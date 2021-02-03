@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import configparser
 import json
 import os
 import subprocess
@@ -28,8 +29,6 @@ import charmhelpers.contrib.database.mysql as mysql
 
 import charmhelpers.contrib.openstack.templating as os_templating
 
-
-MYSQLROUTER_CNF = "/var/lib/mysql/mysqlrouter/mysqlrouter.conf"
 
 # Flag Strings
 MYSQL_ROUTER_BOOTSTRAPPED = "charm.mysqlrouter.bootstrapped"
@@ -67,7 +66,7 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
 
     services = [name]
     restart_map = {
-        MYSQLROUTER_CNF: services,
+        "/var/lib/mysql/{}/mysqlrouter.conf".format(name): services
     }
     # TODO Pick group owner
     group = "mysql"
@@ -201,6 +200,15 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
         :rtype: str
         """
         return "/var/lib/mysql"
+
+    @property
+    def mysqlrouter_conf(self):
+        """Determine the path to the mysqlrouter.conf file.
+
+        :returns: Path to the mysqlrouter.conf file
+        :rtype: str
+        """
+        return "{}/mysqlrouter.conf".format(self.mysqlrouter_working_dir)
 
     @property
     def mysqlrouter_user(self):
@@ -515,6 +523,20 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
             _ssl_ca = receiving_interface.ssl_ca()
             if _ssl_ca:
                 _ssl_ca = json.loads(_ssl_ca)
+                # We are using CA signed certificates with validation for TLS
+                # Set client_ssl_mode = PASSTHROUGH
+                self.update_config_parameter(
+                    "DEFAULT", "client_ssl_mode", "PASSTHROUGH")
+            else:
+                # Reset ssl_ca in case we previously had it set
+                ch_core.hookenv.log("Proactively resetting ssl_ca", "DEBUG")
+                sending_interface.relations[
+                    unit.relation.relation_id].to_publish_raw["ssl_ca"] = None
+                # We are using self-signed certificates for TLS
+                # Set client_ssl_mode = PREFERRED
+                self.update_config_parameter(
+                    "DEFAULT", "client_ssl_mode", "PREFERRED")
+
             if ch_core.hookenv.local_unit() in (json.loads(
                     receiving_interface.allowed_units(prefix=prefix))):
                 _allowed_hosts = unit.unit_name
@@ -532,3 +554,30 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
                 wait_timeout=_wait_timeout,
                 db_port=self.mysqlrouter_port,
                 ssl_ca=_ssl_ca)
+
+    def update_config_parameter(self, heading, param, value):
+        """Update configuration parameter.
+
+        Update this instances mysqlrouter.conf with a key=value.
+        Such that under heading we get param = value.
+        Restart on changed based on the mysqlrouter.conf.
+
+        :param heading: The config file heading i.e. 'DEFAULT'
+        :type heading: str
+        :param param: The parameter key
+        :type param: str
+        :param value: The value getting set
+        :type value: str
+        :side effect: Writes the mysqlrouter.conf file and restarts services if
+                      there is a change.
+        :returns: This function is called for its side effect
+        :rtype: None
+        """
+        config = configparser.ConfigParser()
+        config.read(self.mysqlrouter_conf)
+        config[heading][param] = value
+        ch_core.hookenv.log("Updating {} with {} {} = {}".format(
+            self.mysqlrouter_conf, heading, param, value))
+        with self.restart_on_change():
+            with open(self.mysqlrouter_conf, 'w') as configfile:
+                config.write(configfile)
