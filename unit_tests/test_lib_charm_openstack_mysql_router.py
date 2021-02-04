@@ -392,6 +392,7 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
              "--directory", mrc.mysqlrouter_working_dir,
              "--conf-use-sockets",
              "--conf-bind-address", mrc.shared_db_address,
+             "--report-host", mrc.db_router_address,
              "--conf-base-port", _port],
             stderr=self.stdout)
         self.set_flag.assert_called_once_with(
@@ -408,6 +409,7 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
              "--directory", mrc.mysqlrouter_working_dir,
              "--conf-use-sockets",
              "--conf-bind-address", mrc.shared_db_address,
+             "--report-host", mrc.db_router_address,
              "--conf-base-port", _port,
              "--disable-rest"],
             stderr=self.stdout)

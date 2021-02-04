@@ -388,6 +388,7 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
                "--directory", self.mysqlrouter_working_dir,
                "--conf-use-sockets",
                "--conf-bind-address", self.shared_db_address,
+               "--report-host", self.db_router_address,
                "--conf-base-port", str(self.mysqlrouter_port)]
         # Avoid multiple routers trying to bind to the same api port
         # Bug #1911907
