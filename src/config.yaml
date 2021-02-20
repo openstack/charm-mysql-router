@@ -20,3 +20,27 @@ options:
     description: |
         Base port number for RW interface. RO, xRW and xRO will
         increment from base_port.
+  ttl:
+    type: float
+    default: .5
+    description: |
+        Time to live (in seconds) of information in the metadata cache.
+        Accepts either an integer or a floating point value. The granularity is
+        limited to milliseconds, where 0.001 equates to one millisecond.
+        Precision is truncated to the supported range; for example ttl=0.0119
+        is treated as 11 milliseconds. The value 0 means that the metadata
+        cache module queries the metadata continuously in a tight loop.
+  auth_cache_refresh_interval:
+    type: int
+    default: 2
+    description: |
+        Time (in seconds) between the auth-cache refresh attempts. Defaults to
+        2. The value must be smaller than auth_cache_ttl and ttl else Router
+        won't start.
+  auth_cache_ttl:
+    type: int
+    default: -1
+    description: |
+        Time (in seconds) until the cache becomes invalid if not refreshed.
+        Defaults to -1 (infinite). The value must be larger than
+        auth_cache_refresh_interval else Router won't start.

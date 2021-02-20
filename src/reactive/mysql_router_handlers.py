@@ -99,5 +99,6 @@ def proxy_shared_db_responses(shared_db, db_router):
     :type db_router_interface: MySQLRouterRequires object
     """
     with charm.provide_charm_instance() as instance:
+        instance.config_changed()
         instance.proxy_db_and_user_responses(db_router, shared_db)
         instance.assess_status()

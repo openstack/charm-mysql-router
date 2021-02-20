@@ -16,6 +16,7 @@ import configparser
 import json
 import os
 import subprocess
+import tenacity
 
 import charms_openstack.charm
 import charms_openstack.adapters
@@ -28,6 +29,7 @@ import charmhelpers.contrib.network.ip as ch_net_ip
 import charmhelpers.contrib.database.mysql as mysql
 
 import charmhelpers.contrib.openstack.templating as os_templating
+import charmhelpers.contrib.openstack.utils as os_utils
 
 
 # Flag Strings
@@ -73,6 +75,10 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
 
     # For internal use with mysql.get_db_data
     _unprefixed = "MRUP"
+
+    # mysql.MySQLdb._exceptions.OperationalError error 2013
+    # LP Bug #1915842
+    _waiting_for_initial_communication_packet_error = 2013
 
     @property
     def mysqlrouter_bin(self):
@@ -218,6 +224,24 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
     def mysqlrouter_group(self):
         return "mysql"
 
+    @property
+    def ssl_ca(self):
+        """Return the SSL Certificate Authority
+
+        :param self: Self
+        :type self: MySQLInnoDBClusterCharm instance
+        :returns: Cluster username
+        :rtype: str
+        :rtype: Union[str, None]
+        """
+        if self.db_router_endpoint:
+            if self.db_router_endpoint.ssl_ca():
+                return json.loads(self.db_router_endpoint.ssl_ca())
+
+    @property
+    def restart_functions(self):
+        return {self.name: self.custom_restart_function}
+
     def install(self):
         """Custom install function.
 
@@ -313,12 +337,16 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
 
         return states_to_check
 
-    def check_mysql_connection(self):
+    def check_mysql_connection(self, reraise_on=None):
         """Check if an instance of MySQL is accessible.
 
         Attempt a connection to the given instance of mysql to determine if it
         is running and accessible.
 
+        :param reraise_on: List of integer error codes to reraise exceptions.
+                           For use with tenacity retries on specific
+                           exceptions.
+        :type reraise_on: List[int]
         :side effect: Uses get_db_helper to execute a connection to the DB.
         :returns: True if connection succeeds or False if not
         :rtype: boolean
@@ -331,9 +359,13 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
                              port=self.mysqlrouter_port,
                              connect_timeout=self.mysql_connect_timeout)
             return True
-        except mysql.MySQLdb._exceptions.OperationalError:
+        except mysql.MySQLdb._exceptions.OperationalError as e:
             ch_core.hookenv.log("Could not connect to db", "DEBUG")
-            return False
+            if not reraise_on:
+                return False
+            else:
+                if e.args[0] in reraise_on:
+                    raise e
 
     def custom_assess_status_check(self):
         """Custom assess status check.
@@ -524,19 +556,11 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
             _ssl_ca = receiving_interface.ssl_ca()
             if _ssl_ca:
                 _ssl_ca = json.loads(_ssl_ca)
-                # We are using CA signed certificates with validation for TLS
-                # Set client_ssl_mode = PASSTHROUGH
-                self.update_config_parameter(
-                    "DEFAULT", "client_ssl_mode", "PASSTHROUGH")
             else:
                 # Reset ssl_ca in case we previously had it set
                 ch_core.hookenv.log("Proactively resetting ssl_ca", "DEBUG")
                 sending_interface.relations[
                     unit.relation.relation_id].to_publish_raw["ssl_ca"] = None
-                # We are using self-signed certificates for TLS
-                # Set client_ssl_mode = PREFERRED
-                self.update_config_parameter(
-                    "DEFAULT", "client_ssl_mode", "PREFERRED")
 
             if ch_core.hookenv.local_unit() in (json.loads(
                     receiving_interface.allowed_units(prefix=prefix))):
@@ -556,29 +580,100 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
                 db_port=self.mysqlrouter_port,
                 ssl_ca=_ssl_ca)
 
-    def update_config_parameter(self, heading, param, value):
-        """Update configuration parameter.
+    def update_config_parameters(self, parameters):
+        """Update configuration parameters using ConfigParser.
 
-        Update this instances mysqlrouter.conf with a key=value.
-        Such that under heading we get param = value.
-        Restart on changed based on the mysqlrouter.conf.
+        Update this instances mysqlrouter.conf with a dictionary set of
+        configuration parameters and values of the form:
 
-        :param heading: The config file heading i.e. 'DEFAULT'
-        :type heading: str
-        :param param: The parameter key
-        :type param: str
-        :param value: The value getting set
-        :type value: str
-        :side effect: Writes the mysqlrouter.conf file and restarts services if
-                      there is a change.
+        parameters = {
+            "HEADING": {
+                "param": "value"
+            }
+        }
+
+        :param parameters: Dictionary of parameters
+        :type parameters: dict
+        :side effect: Writes the mysqlrouter.conf file
         :returns: This function is called for its side effect
         :rtype: None
         """
         config = configparser.ConfigParser()
         config.read(self.mysqlrouter_conf)
-        config[heading][param] = value
-        ch_core.hookenv.log("Updating {} with {} {} = {}".format(
-            self.mysqlrouter_conf, heading, param, value))
-        with self.restart_on_change():
-            with open(self.mysqlrouter_conf, 'w') as configfile:
-                config.write(configfile)
+        for heading in parameters.keys():
+            for param in parameters[heading].keys():
+                config[heading][param] = parameters[heading][param]
+        ch_core.hookenv.log("Writing {}".format(
+            self.mysqlrouter_conf))
+        with open(self.mysqlrouter_conf, 'w') as configfile:
+            config.write(configfile)
+
+    def config_changed(self):
+        """Config changed.
+
+        Custom config changed as we are not using templates we need to update
+        config via ConfigParser. We only update after the mysql-router service
+        has bootstrapped.
+
+        :side effect: Calls update_config_parameter and restarts mysql-router
+                      if the config file has changed.
+        :returns: This function is called for its side effect
+        :rtype: None
+        """
+        if not os.path.exists(self.mysqlrouter_conf):
+            ch_core.hookenv.log(
+                "mysqlrouter.conf does not yet exist. "
+                "Skipping config changed.", "DEBUG")
+            return
+
+        _parameters = {
+            "metadata_cache:jujuCluster": {
+                "ttl": str(self.options.ttl),
+                "auth_cache_ttl": str(self.options.auth_cache_ttl),
+                "auth_cache_refresh_interval":
+                    str(self.options.auth_cache_refresh_interval),
+            }
+        }
+
+        if self.ssl_ca:
+            ch_core.hookenv.log("TLS mode PASSTHROUGH", "DEBUG")
+            _parameters["DEFAULT"] = {"client_ssl_mode": "PASSTHROUGH"}
+        else:
+            ch_core.hookenv.log("TLS mode PREFERRED", "DEBUG")
+            _parameters["DEFAULT"] = {"client_ssl_mode": "PREFERRED"}
+
+        # NOTE: LP Bug #1917792
+        # Switch to context manager when work there is completed
+        @os_utils.pausable_restart_on_change(
+            self.restart_map, restart_functions=self.restart_functions)
+        def _config_changed(self, parameters):
+            ch_core.hookenv.log("Updating configuration parameters", "DEBUG")
+            self.update_config_parameters(parameters)
+
+        _config_changed(self, _parameters)
+
+    @tenacity.retry(wait=tenacity.wait_fixed(10),
+                    retry=tenacity.retry_if_exception_type(
+                        mysql.MySQLdb._exceptions.OperationalError),
+                    reraise=True,
+                    stop=tenacity.stop_after_attempt(5))
+    def custom_restart_function(self, service_name):
+        """Tenacity retry custom restart function for restart_on_change
+
+        Custom restart function for use in restart_on_change contexts. Tenacity
+        retry enabled based on verification of connectivity.
+
+        :side effect: Calls service_stop and service_start on the mysql-router
+                      service(s).
+        :returns: This function is called for its side effect
+        :rtype: None
+        """
+        ch_core.hookenv.log(
+            "Custom restart of {}".format(service_name), "DEBUG")
+        self.service_stop(service_name)
+        self.service_start(service_name)
+        # Only raise an exception if it matches
+        # mysql.MySQLdb._exceptions.OperationalError error 2013
+        # LP Bug #1915842
+        self.check_mysql_connection(
+            reraise_on=[self._waiting_for_initial_communication_packet_error])

@@ -600,15 +600,75 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
             self.db_router, self.keystone_shared_db)
         self.keystone_shared_db.set_db_connection_info.assert_not_called()
 
-    def test_update_config_parameter(self):
+    def test_update_config_parameters(self):
         self.patch_object(mysql_router.configparser, "ConfigParser")
 
         self.service_name = "mysql-router"
         _mock_config_parser = mock.MagicMock()
         self.ConfigParser.return_value = _mock_config_parser
 
+        _params = {"DEFAULT": {"client_ssl_mode": "PREFERRED"}}
+
         mrc = mysql_router.MySQLRouterCharm()
-        mrc.update_config_parameter("DEFAULT", "client_ssl_mode", "PREFERRED")
+        mrc.update_config_parameters(_params)
         _mock_config_parser.read.assert_called_once()
+        _mock_config_parser.__getitem__.assert_called_once_with('DEFAULT')
+        _mock_config_parser.__getitem__().__setitem__.assert_called_once_with(
+            'client_ssl_mode', 'PREFERRED')
         _mock_config_parser.write.assert_called_once_with(
             self.mock_open()().__enter__())
+
+    def test_config_changed(self):
+        _config_data = {
+            "ttl": '5',
+            "auth_cache_ttl": '10',
+            "auth_cache_refresh_interval": '7',
+        }
+        _mock_decorator = mock.MagicMock()
+        _mock_decorated = mock.MagicMock()
+        _mock_decorator.return_value = _mock_decorated
+
+        def _fake_config(key=None):
+            return _config_data[key] if key else _config_data
+
+        self.patch_object(mysql_router.ch_core.hookenv, "config")
+        self.patch_object(mysql_router.os.path, "exists")
+        self.patch_object(mysql_router.os_utils, "pausable_restart_on_change")
+        self.config.side_effect = _fake_config
+        self.pausable_restart_on_change.return_value = _mock_decorator
+        self.service_name = "mysql-router"
+        self.endpoint_from_flag.return_value = self.db_router
+        self.db_router.ssl_ca.return_value = '"CACERT"'
+
+        _mock_update_config_parameters = mock.MagicMock()
+        mrc = mysql_router.MySQLRouterCharm()
+        mrc.update_config_parameters = _mock_update_config_parameters
+
+        _params = {
+            'metadata_cache:jujuCluster': _config_data,
+            'DEFAULT': {'client_ssl_mode': "PASSTHROUGH"},
+        }
+
+        # Not bootstrapped yet
+        self.exists.return_value = False
+        mrc.config_changed()
+        _mock_update_config_parameters.assert_not_called()
+
+        # Bootstrapped
+        self.exists.return_value = True
+        mrc.config_changed()
+        _mock_decorated.assert_has_calls([mock.call(mrc, _params)])
+
+    def test_custom_restart_function(self):
+        self.patch_object(mysql_router.ch_core.host, "service_stop")
+        self.patch_object(mysql_router.ch_core.host, "service_start")
+        self.service_name = "mysql-router"
+        _mock_check_mysql_connection = mock.MagicMock()
+
+        mrc = mysql_router.MySQLRouterCharm()
+        mrc.check_mysql_connection = _mock_check_mysql_connection
+
+        mrc.custom_restart_function(self.service_name)
+        self.service_stop.assert_called_once_with(self.service_name)
+        self.service_start.assert_called_once_with(self.service_name)
+        _mock_check_mysql_connection.assert_called_once()
