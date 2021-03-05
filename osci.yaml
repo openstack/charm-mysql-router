@@ -5,12 +5,21 @@
       jobs:
       - focal
       - groovy
+      - hirsute
       - full_model_ha-focal-full-ha
       - full_model_ha-groovy-full-ha
+      - full_model_ha-hirsute-full-ha
     vars:
       needs_charm_build: true
       charm_build_name: mysql-router
 
+- job:
+    name: full_model_ha-focal-full-ha
+    parent: func-target
+    dependencies:
+      - focal
+    vars:
+      tox_extra_args: full_model_ha:focal-full-ha
 - job:
     name: full_model_ha-groovy-full-ha
     parent: func-target
@@ -19,9 +28,9 @@
     vars:
       tox_extra_args: full_model_ha:groovy-full-ha
 - job:
-    name: full_model_ha-focal-full-ha
+    name: full_model_ha-hirsute-full-ha
     parent: func-target
     dependencies:
       - focal
     vars:
-      tox_extra_args: full_model_ha:focal-full-ha
+      tox_extra_args: full_model_ha:hirsute-full-ha

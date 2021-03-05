@@ -1,4 +1,5 @@
 charm_name: mysql-router
+
 configure:
 - zaza.openstack.charm_tests.vault.setup.auto_initialize
 - zaza.openstack.charm_tests.keystone.setup.add_demo_user
@@ -9,6 +10,7 @@ configure:
     - zaza.openstack.charm_tests.nova.setup.create_flavors
     - zaza.openstack.charm_tests.nova.setup.manage_ssh_key
     - zaza.openstack.charm_tests.keystone.setup.add_demo_user
+
 tests:
 - zaza.openstack.charm_tests.mysql.tests.MySQLRouterTests
 - zaza.openstack.charm_tests.keystone.tests.AuthenticationAuthorizationTest
@@ -16,19 +18,27 @@ tests:
     - zaza.openstack.charm_tests.mysql.tests.MySQLRouterTests
     - zaza.openstack.charm_tests.keystone.tests.AuthenticationAuthorizationTest
     - zaza.openstack.charm_tests.hacluster.tests.HaclusterScaleBackAndForthTest
+
 gate_bundles:
 - full_model_ha: focal-full-ha
 - groovy
 - full_model_ha: groovy-full-ha
+
+dev_bundles:
+- hirsute
+- full_model_ha: hirsute-full-ha
+
 smoke_bundles:
 - focal
+
 tests_options:
   hacluster:
     principle-app-name: keystone
     hacluster-charm-name: hacluster
   force_deploy:
-   - groovy
-   - groovy-full-ha
+   - hirsute
+   - hirsute-full-ha
+
 target_deploy_status:
   neutron-api-plugin-ovn:
     workload-status: waiting
