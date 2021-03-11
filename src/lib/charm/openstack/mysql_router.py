@@ -413,6 +413,7 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
         """
         cmd = [self.mysqlrouter_bin,
                "--user", self.mysqlrouter_user,
+               "--name", self.name,
                "--bootstrap",
                "{}:{}@{}".format(self.db_router_user,
                                  self.db_router_password,

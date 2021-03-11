@@ -387,8 +387,9 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
         self.cmp_pkgrevno.return_value = -1
         mrc.bootstrap_mysqlrouter()
         self.subprocess.check_output.assert_called_once_with(
-            [mrc.mysqlrouter_bin, "--user", _user, "--bootstrap",
-             "{}:{}@{}".format(mrc.db_router_user, _pass, _addr),
+            [mrc.mysqlrouter_bin, "--user", _user, "--name", mrc.name,
+             "--bootstrap", "{}:{}@{}"
+             .format(mrc.db_router_user, _pass, _addr),
              "--directory", mrc.mysqlrouter_working_dir,
              "--conf-use-sockets",
              "--conf-bind-address", mrc.shared_db_address,
@@ -404,8 +405,9 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
         self.cmp_pkgrevno.return_value = 1
         mrc.bootstrap_mysqlrouter()
         self.subprocess.check_output.assert_called_once_with(
-            [mrc.mysqlrouter_bin, "--user", _user, "--bootstrap",
-             "{}:{}@{}".format(mrc.db_router_user, _pass, _addr),
+            [mrc.mysqlrouter_bin, "--user", _user, "--name", mrc.name,
+             "--bootstrap", "{}:{}@{}"
+             .format(mrc.db_router_user, _pass, _addr),
              "--directory", mrc.mysqlrouter_working_dir,
              "--conf-use-sockets",
              "--conf-bind-address", mrc.shared_db_address,
@@ -603,7 +605,6 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
     def test_update_config_parameters(self):
         self.patch_object(mysql_router.configparser, "ConfigParser")
 
-        self.service_name = "mysql-router"
         _mock_config_parser = mock.MagicMock()
         self.ConfigParser.return_value = _mock_config_parser
 
@@ -636,7 +637,6 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
         self.patch_object(mysql_router.os_utils, "pausable_restart_on_change")
         self.config.side_effect = _fake_config
         self.pausable_restart_on_change.return_value = _mock_decorator
-        self.service_name = "mysql-router"
         self.endpoint_from_flag.return_value = self.db_router
         self.db_router.ssl_ca.return_value = '"CACERT"'
 
