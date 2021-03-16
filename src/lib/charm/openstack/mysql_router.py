@@ -29,7 +29,6 @@ import charmhelpers.contrib.network.ip as ch_net_ip
 import charmhelpers.contrib.database.mysql as mysql
 
 import charmhelpers.contrib.openstack.templating as os_templating
-import charmhelpers.contrib.openstack.utils as os_utils
 
 
 # Flag Strings
@@ -643,15 +642,10 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
             ch_core.hookenv.log("TLS mode PREFERRED", "DEBUG")
             _parameters["DEFAULT"] = {"client_ssl_mode": "PREFERRED"}
 
-        # NOTE: LP Bug #1917792
-        # Switch to context manager when work there is completed
-        @os_utils.pausable_restart_on_change(
-            self.restart_map, restart_functions=self.restart_functions)
-        def _config_changed(self, parameters):
+        with ch_core.host.restart_on_change(
+                self.restart_map, restart_functions=self.restart_functions):
             ch_core.hookenv.log("Updating configuration parameters", "DEBUG")
-            self.update_config_parameters(parameters)
-
-        _config_changed(self, _parameters)
+            self.update_config_parameters(_parameters)
 
     @tenacity.retry(wait=tenacity.wait_fixed(10),
                     retry=tenacity.retry_if_exception_type(
