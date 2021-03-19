@@ -13,7 +13,7 @@ tests:
 - zaza.openstack.charm_tests.keystone.tests.AuthenticationAuthorizationTest
 - full_model_ha:
     - zaza.openstack.charm_tests.keystone.tests.AuthenticationAuthorizationTest
-    - zaza.openstack.charm_tests.hacluster.tests.HaclusterScalebackTest
+    - zaza.openstack.charm_tests.hacluster.tests.HaclusterScaleBackAndForthTest
 gate_bundles:
 - full_model_ha: focal-full-ha
 - groovy
