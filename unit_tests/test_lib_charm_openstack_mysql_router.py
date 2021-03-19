@@ -375,9 +375,11 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
         _addr = json.loads(_json_addr)
         _user = "mysql"
         _port = "3006"
+        self.patch_object(mysql_router.reactive.flags, "is_flag_set")
         self.endpoint_from_flag.return_value = self.db_router
         self.db_router.password.return_value = _json_pass
         self.db_router.db_host.return_value = _json_addr
+        self.is_flag_set.return_value = False
 
         mrc = mysql_router.MySQLRouterCharm()
         mrc.options.system_user = _user
@@ -396,12 +398,16 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
              "--report-host", mrc.db_router_address,
              "--conf-base-port", _port],
             stderr=self.stdout)
-        self.set_flag.assert_called_once_with(
-            mysql_router.MYSQL_ROUTER_BOOTSTRAPPED)
+        self.set_flag.assert_has_calls([
+            mock.call(mysql_router.MYSQL_ROUTER_BOOTSTRAP_ATTEMPTED),
+            mock.call(mysql_router.MYSQL_ROUTER_BOOTSTRAPPED)])
+        self.clear_flag.assert_called_once_with(
+            mysql_router.MYSQL_ROUTER_BOOTSTRAP_ATTEMPTED)
 
         # Successful >= 8.0.22
         self.subprocess.reset_mock()
         self.set_flag.reset_mock()
+        self.clear_flag.reset_mock()
         self.cmp_pkgrevno.return_value = 1
         mrc.bootstrap_mysqlrouter()
         self.subprocess.check_output.assert_called_once_with(
@@ -415,17 +421,53 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
              "--conf-base-port", _port,
              "--disable-rest"],
             stderr=self.stdout)
-        self.set_flag.assert_called_once_with(
-            mysql_router.MYSQL_ROUTER_BOOTSTRAPPED)
+        self.set_flag.assert_has_calls([
+            mock.call(mysql_router.MYSQL_ROUTER_BOOTSTRAP_ATTEMPTED),
+            mock.call(mysql_router.MYSQL_ROUTER_BOOTSTRAPPED)])
+        self.clear_flag.assert_called_once_with(
+            mysql_router.MYSQL_ROUTER_BOOTSTRAP_ATTEMPTED)
 
-        # Fail
+        # First attempt fail
         self.subprocess.reset_mock()
         self.set_flag.reset_mock()
         self.subprocess.CalledProcessError = FakeException
         self.subprocess.check_output.side_effect = (
             self.subprocess.CalledProcessError)
         mrc.bootstrap_mysqlrouter()
-        self.set_flag.assert_not_called()
+        self.set_flag.assert_called_once_with(
+            mysql_router.MYSQL_ROUTER_BOOTSTRAP_ATTEMPTED)
+
+        # Bail
+        self.subprocess.reset_mock()
+        self.set_flag.reset_mock()
+        self.is_flag_set.return_value = True
+        mrc.bootstrap_mysqlrouter()
+        self.subprocess.check_output.assert_not_called()
+
+        # Second attempt success
+        self.subprocess.reset_mock()
+        self.set_flag.reset_mock()
+        self.clear_flag.reset_mock()
+        self.cmp_pkgrevno.return_value = 1
+        self.is_flag_set.side_effect = [False, True]
+        self.subprocess.check_output.side_effect = None
+        mrc.bootstrap_mysqlrouter()
+        self.subprocess.check_output.assert_called_once_with(
+            [mrc.mysqlrouter_bin, "--user", _user, "--name", mrc.name,
+             "--bootstrap", "{}:{}@{}"
+             .format(mrc.db_router_user, _pass, _addr),
+             "--directory", mrc.mysqlrouter_working_dir,
+             "--conf-use-sockets",
+             "--conf-bind-address", mrc.shared_db_address,
+             "--report-host", mrc.db_router_address,
+             "--conf-base-port", _port,
+             "--disable-rest", "--force"],
+            stderr=self.stdout)
+        self.set_flag.assert_has_calls([
+            mock.call(mysql_router.MYSQL_ROUTER_BOOTSTRAP_ATTEMPTED),
+            mock.call(mysql_router.MYSQL_ROUTER_BOOTSTRAPPED)])
+        self.clear_flag.assert_called_once_with(
+            mysql_router.MYSQL_ROUTER_BOOTSTRAP_ATTEMPTED)
 
     def test_start_mysqlrouter(self):
         self.patch_object(mysql_router.ch_core.host, "service_start")

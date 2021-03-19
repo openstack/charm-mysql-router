@@ -33,6 +33,7 @@ import charmhelpers.contrib.openstack.templating as os_templating
 
 # Flag Strings
 MYSQL_ROUTER_BOOTSTRAPPED = "charm.mysqlrouter.bootstrapped"
+MYSQL_ROUTER_BOOTSTRAP_ATTEMPTED = "charm.mysqlrouter.bootstrap-attempted"
 MYSQL_ROUTER_STARTED = "charm.mysqlrouter.started"
 DB_ROUTER_AVAILABLE = "db-router.available"
 DB_ROUTER_PROXY_AVAILABLE = "db-router.available.proxy"
@@ -410,6 +411,16 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
         :returns: This function is called for its side effect
         :rtype: None
         """
+
+        if reactive.flags.is_flag_set(MYSQL_ROUTER_BOOTSTRAPPED):
+            ch_core.hookenv.log(
+                "Bootstrap mysqlrouter is being called after we set the "
+                "bootstrapped flag: {}. This may require manual intervention,"
+                "bailing for now."
+                .format(MYSQL_ROUTER_BOOTSTRAPPED),
+                "WARNING")
+            return
+
         cmd = [self.mysqlrouter_bin,
                "--user", self.mysqlrouter_user,
                "--name", self.name,
@@ -426,6 +437,14 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
         # Bug #1911907
         if ch_core.host.cmp_pkgrevno('mysql-router', '8.0.22') >= 0:
             cmd.append("--disable-rest")
+
+        # If we have attempted to bootstrap before but unsuccessfully,
+        # use the force option to avoid LP Bug#1919560
+        if reactive.flags.is_flag_set(MYSQL_ROUTER_BOOTSTRAP_ATTEMPTED):
+            cmd.append("--force")
+
+        # Set and attempt the bootstrap
+        reactive.flags.set_flag(MYSQL_ROUTER_BOOTSTRAP_ATTEMPTED)
         try:
             output = subprocess.check_output(cmd, stderr=subprocess.STDOUT)
             ch_core.hookenv.log(output, "DEBUG")
@@ -434,6 +453,9 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
                 "Failed to bootstrap mysqlrouter: {}"
                 .format(e.output.decode("UTF-8")), "ERROR")
             return
+        # Clear the attempted flag as we were successful
+        reactive.flags.clear_flag(MYSQL_ROUTER_BOOTSTRAP_ATTEMPTED)
+        # Set that we have been bootstrapped
         reactive.flags.set_flag(MYSQL_ROUTER_BOOTSTRAPPED)
 
     def start_mysqlrouter(self):
