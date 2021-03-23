@@ -625,20 +625,15 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
             "auth_cache_ttl": '10',
             "auth_cache_refresh_interval": '7',
         }
-        _mock_decorator = mock.MagicMock()
-        _mock_decorated = mock.MagicMock()
-        _mock_decorator.return_value = _mock_decorated
 
         def _fake_config(key=None):
             return _config_data[key] if key else _config_data
 
         self.patch_object(mysql_router.ch_core.hookenv, "config")
         self.patch_object(mysql_router.os.path, "exists")
-        self.patch_object(mysql_router.os_utils, "pausable_restart_on_change")
+        self.patch_object(mysql_router.ch_core.host, "restart_on_change")
         self.config.side_effect = _fake_config
-        self.pausable_restart_on_change.return_value = _mock_decorator
         self.endpoint_from_flag.return_value = self.db_router
-        self.db_router.ssl_ca.return_value = '"CACERT"'
 
         _mock_update_config_parameters = mock.MagicMock()
         mrc = mysql_router.MySQLRouterCharm()
@@ -654,10 +649,19 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
         mrc.config_changed()
         _mock_update_config_parameters.assert_not_called()
 
-        # Bootstrapped
+        # With TLS PASSTHROUGH
+        self.db_router.ssl_ca.return_value = '"CACERT"'
         self.exists.return_value = True
         mrc.config_changed()
-        _mock_decorated.assert_has_calls([mock.call(mrc, _params)])
+        _mock_update_config_parameters.assert_called_once_with(_params)
+
+        # With TLS PREFERRED
+        self.db_router.ssl_ca.return_value = None
+        _params["DEFAULT"]["client_ssl_mode"] = "PREFERRED"
+        self.exists.return_value = True
+        _mock_update_config_parameters.reset_mock()
+        mrc.config_changed()
+        _mock_update_config_parameters.assert_called_once_with(_params)
 
     def test_custom_restart_function(self):
         self.patch_object(mysql_router.ch_core.host, "service_stop")
