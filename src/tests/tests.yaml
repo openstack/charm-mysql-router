@@ -1,4 +1,6 @@
-charm_name: mysql-router
+# Note: LP Bug#1931117
+# Set the charm name to an actual instantiation of mysql-router
+charm_name: keystone-mysql-router
 
 configure:
 - zaza.openstack.charm_tests.vault.setup.auto_initialize
