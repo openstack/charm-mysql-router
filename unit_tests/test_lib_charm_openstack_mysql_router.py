@@ -679,11 +679,15 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
 
         _mock_update_config_parameters = mock.MagicMock()
         mrc = mysql_router.MySQLRouterCharm()
+        mrc.name = 'foobar'
         mrc.update_config_parameters = _mock_update_config_parameters
 
         _params = {
             'metadata_cache:jujuCluster': _config_data,
-            'DEFAULT': {'client_ssl_mode': "PASSTHROUGH"},
+            'DEFAULT': {
+                'client_ssl_mode': "PASSTHROUGH",
+                'pid_file': '/run/mysql/mysqlrouter-foobar.pid'
+            },
         }
 
         # Not bootstrapped yet

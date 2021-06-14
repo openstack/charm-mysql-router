@@ -81,6 +81,17 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
     _waiting_for_initial_communication_packet_error = 2013
 
     @property
+    def mysqlrouter_pid_file(self):
+        """Determine the path for the mysqlrouter PID file.
+
+        :param self: Self
+        :type self: MySQLRouterCharm instance
+        :returns: Path to the PID file in /run
+        :rtype: str
+        """
+        return "/run/mysql/mysqlrouter-{}.pid".format(self.name)
+
+    @property
     def mysqlrouter_bin(self):
         """Determine the path to the mysqlrouter binary.
 
@@ -654,15 +665,18 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
                 "auth_cache_ttl": str(self.options.auth_cache_ttl),
                 "auth_cache_refresh_interval":
                     str(self.options.auth_cache_refresh_interval),
+            },
+            "DEFAULT": {
+                "pid_file": self.mysqlrouter_pid_file,
             }
         }
 
         if self.ssl_ca:
             ch_core.hookenv.log("TLS mode PASSTHROUGH", "DEBUG")
-            _parameters["DEFAULT"] = {"client_ssl_mode": "PASSTHROUGH"}
+            _parameters["DEFAULT"]["client_ssl_mode"] = "PASSTHROUGH"
         else:
             ch_core.hookenv.log("TLS mode PREFERRED", "DEBUG")
-            _parameters["DEFAULT"] = {"client_ssl_mode": "PREFERRED"}
+            _parameters["DEFAULT"]["client_ssl_mode"] = "PREFERRED"
 
         with ch_core.host.restart_on_change(
                 self.restart_map, restart_functions=self.restart_functions):
