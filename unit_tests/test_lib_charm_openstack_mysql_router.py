@@ -661,6 +661,35 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
         _mock_config_parser.write.assert_called_once_with(
             self.mock_open()().__enter__())
 
+    def test_update_config_parameters_missing_heading(self):
+        # test fix for Bug LP#1927981
+        class FakeConfigParser(dict):
+            def read(*args, **kwargs):
+                pass
+
+            def write(*args, **kwargs):
+                pass
+
+        current_config = {"DEFAULT": {"client_ssl_mode": "NONE"}}
+        fake_config = FakeConfigParser(current_config)
+
+        self.patch_object(mysql_router.configparser, "ConfigParser",
+                          return_value=fake_config)
+
+        # metadata_cache:jujuCluster didn't exist in the previous config so the
+        # header needs to be created (c.f. BUG LP#1927981)
+        _params = {
+            "DEFAULT": {"client_ssl_mode": "PREFERRED"},
+            "metadata_cache:jujuCluster": {"thing": "a-thing"},
+        }
+
+        mrc = mysql_router.MySQLRouterCharm()
+        # should not throw a key error.
+        mrc.update_config_parameters(_params)
+        self.assertIn('metadata_cache:jujuCluster', fake_config)
+        self.assertEqual(fake_config['metadata_cache:jujuCluster'],
+                         {"thing": "a-thing"})
+
     def test_config_changed(self):
         _config_data = {
             "ttl": '5',
