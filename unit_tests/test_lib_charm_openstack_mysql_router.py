@@ -1,4 +1,4 @@
-# Copyright 2019 Canonical Ltd
+# Copyright 2019-2021 Canonical Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -270,7 +270,7 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
 
         self.render.assert_called_once()
         self.subprocess.check_output.assert_called_once_with(
-            ['/usr/bin/systemctl', 'enable', _name],
+            ['systemctl', 'enable', _name],
             stderr=self.subprocess.STDOUT)
 
     def test_get_db_helper(self):

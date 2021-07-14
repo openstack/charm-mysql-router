@@ -1,4 +1,4 @@
-# Copyright 2019 Canonical Ltd
+# Copyright 2019-2021 Canonical Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -298,7 +298,7 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
             group=self.group,
             perms=0o755,
         )
-        cmd = ["/usr/bin/systemctl", "enable", self.name]
+        cmd = ["systemctl", "enable", self.name]
         subprocess.check_output(cmd, stderr=subprocess.STDOUT)
 
     def get_db_helper(self):
