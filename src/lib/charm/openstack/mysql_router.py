@@ -635,7 +635,12 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
         config.read(self.mysqlrouter_conf)
         for heading in parameters.keys():
             for param in parameters[heading].keys():
-                config[heading][param] = parameters[heading][param]
+                # BUG LP#1927981 - heading may not exist during a charm upgrade
+                # Handle missing heading via direct assignment in except.
+                try:
+                    config[heading][param] = parameters[heading][param]
+                except KeyError:
+                    config[heading] = {param: parameters[heading][param]}
         ch_core.hookenv.log("Writing {}".format(
             self.mysqlrouter_conf))
         with open(self.mysqlrouter_conf, 'w') as configfile:
