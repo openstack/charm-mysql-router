@@ -1,4 +1,4 @@
-series: groovy
+series: impish
 applications:
   keystone-mysql-router:
     charm: ../../../mysql-router

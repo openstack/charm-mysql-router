@@ -4,11 +4,13 @@
     check:
       jobs:
       - focal
-      - groovy
       - hirsute
+      - impish:
+          voting: false
       - full_model_ha-focal-full-ha
-      - full_model_ha-groovy-full-ha
       - full_model_ha-hirsute-full-ha
+      - full_model_ha-impish-full-ha:
+          voting: false
     vars:
       needs_charm_build: true
       charm_build_name: mysql-router
@@ -34,3 +36,10 @@
       - focal
     vars:
       tox_extra_args: full_model_ha:hirsute-full-ha
+- job:
+    name: full_model_ha-impish-full-ha
+    parent: func-target
+    dependencies:
+      - focal
+    vars:
+      tox_extra_args: full_model_ha:impish-full-ha

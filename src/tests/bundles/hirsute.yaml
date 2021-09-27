@@ -1,10 +1,8 @@
 series: hirsute
 applications:
   keystone-mysql-router:
-    series: groovy
     charm: ../../../mysql-router
   vault-mysql-router:
-    series: groovy
     charm: ../../../mysql-router
   mysql-innodb-cluster:
     charm: cs:~openstack-charmers-next/mysql-innodb-cluster

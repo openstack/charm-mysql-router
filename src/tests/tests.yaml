@@ -23,12 +23,14 @@ tests:
 
 gate_bundles:
 - full_model_ha: focal-full-ha
-- groovy
-- full_model_ha: groovy-full-ha
 
 dev_bundles:
+- groovy
+- full_model_ha: groovy-full-ha
 - hirsute
 - full_model_ha: hirsute-full-ha
+- impish
+- full_model_ha: impish-full-ha
 
 smoke_bundles:
 - focal
@@ -38,8 +40,10 @@ tests_options:
     principle-app-name: keystone
     hacluster-charm-name: hacluster
   force_deploy:
-   - hirsute
-   - hirsute-full-ha
+   - groovy
+   - groovy-full-ha
+   - impish
+   - impish-full-ha
 
 target_deploy_status:
   neutron-api-plugin-ovn:
