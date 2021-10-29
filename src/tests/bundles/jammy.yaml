@@ -1,4 +1,4 @@
-series: groovy
+series: jammy
 applications:
   keystone-mysql-router:
     charm: ../../../mysql-router
