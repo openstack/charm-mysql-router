@@ -695,6 +695,7 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
             "ttl": '5',
             "auth_cache_ttl": '10',
             "auth_cache_refresh_interval": '7',
+            "max_connections": '1000',
         }
 
         def _fake_config(key=None):
@@ -711,10 +712,13 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
         mrc.name = 'foobar'
         mrc.update_config_parameters = _mock_update_config_parameters
 
+        _metadata_config = _config_data.copy()
+        _metadata_config.pop('max_connections')
         _params = {
-            'metadata_cache:jujuCluster': _config_data,
+            'metadata_cache:jujuCluster': _metadata_config,
             'DEFAULT': {
                 'client_ssl_mode': "PASSTHROUGH",
+                'max_connections': _config_data['max_connections'],
                 'pid_file': '/run/mysql/mysqlrouter-foobar.pid'
             },
         }

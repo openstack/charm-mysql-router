@@ -44,3 +44,11 @@ options:
         Time (in seconds) until the cache becomes invalid if not refreshed.
         Defaults to -1 (infinite). The value must be larger than
         auth_cache_refresh_interval else Router won't start.
+  max_connections:
+    type: int
+    default: 512
+    description: |
+        Maximum number of connections to allow in direction to each MySQL
+        routing sessions, with one for the RW unit and another one for the RO
+        units of the MySQL innodb cluster. Defaults to 512. A valid range is
+        between 1 and 65535.

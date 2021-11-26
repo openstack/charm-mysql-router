@@ -673,6 +673,7 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
             },
             "DEFAULT": {
                 "pid_file": self.mysqlrouter_pid_file,
+                "max_connections": str(self.options.max_connections),
             }
         }
 
