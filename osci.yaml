@@ -1,16 +1,15 @@
 - project:
     templates:
-      - charm-yoga-unit-jobs
+      - charm-unit-jobs-py38
+      - charm-unit-jobs-py39
     check:
       jobs:
       - focal
-      - hirsute
       - impish:
           voting: false
       - jammy:
           voting: false
       - full_model_ha-focal-full-ha
-      - full_model_ha-hirsute-full-ha
       - full_model_ha-impish-full-ha:
           voting: false
       - full_model_ha-jammy-full-ha:
@@ -26,13 +25,6 @@
       - focal
     vars:
       tox_extra_args: full_model_ha:focal-full-ha
-- job:
-    name: full_model_ha-hirsute-full-ha
-    parent: func-target
-    dependencies:
-      - focal
-    vars:
-      tox_extra_args: full_model_ha:hirsute-full-ha
 - job:
     name: full_model_ha-impish-full-ha
     parent: func-target

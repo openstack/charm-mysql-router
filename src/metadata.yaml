@@ -8,8 +8,6 @@ tags:
 subordinate: true
 series:
 - focal
-- groovy
-- hirsute
 - impish
 provides:
   shared-db:

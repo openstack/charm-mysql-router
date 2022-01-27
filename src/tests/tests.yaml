@@ -23,7 +23,6 @@ tests:
 
 gate_bundles:
 - full_model_ha: focal-full-ha
-- full_model_ha: hirsute-full-ha
 - full_model_ha: impish-full-ha
 
 dev_bundles:
@@ -37,8 +36,6 @@ tests_options:
     principle-app-name: keystone
     hacluster-charm-name: hacluster
   force_deploy:
-   - hirsute
-   - hirsute-full-ha
    - impish
    - impish-full-ha
    - jammy
