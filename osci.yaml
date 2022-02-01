@@ -17,6 +17,7 @@
     vars:
       needs_charm_build: true
       charm_build_name: mysql-router
+      build_type: charmcraft
 
 - job:
     name: full_model_ha-focal-full-ha

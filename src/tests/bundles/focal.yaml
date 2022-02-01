@@ -1,11 +1,13 @@
+local_overlay_enabled: False
+
 series: focal
 applications:
   keystone-mysql-router:
     series: focal
-    charm: ../../../mysql-router
+    charm: ../../../mysql-router.charm
   vault-mysql-router:
     series: focal
-    charm: ../../../mysql-router
+    charm: ../../../mysql-router.charm
   mysql-innodb-cluster:
     charm: ch:mysql-innodb-cluster
     num_units: 3

@@ -1,9 +1,11 @@
+local_overlay_enabled: False
+
 series: impish
 applications:
   keystone-mysql-router:
-    charm: ../../../mysql-router
+    charm: ../../../mysql-router.charm
   vault-mysql-router:
-    charm: ../../../mysql-router
+    charm: ../../../mysql-router.charm
   mysql-innodb-cluster:
     charm: ch:mysql-innodb-cluster
     num_units: 3
