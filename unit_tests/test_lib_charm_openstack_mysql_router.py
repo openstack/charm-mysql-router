@@ -755,8 +755,8 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
             "debug": False,
         }
 
-        def _fake_config(key=None):
-            return _config_data[key] if key else _config_data
+        def _fake_config(data=_config_data, key=None):
+            return data[key] if key else data
 
         self.patch_object(mysql_router.ch_core.hookenv, "config")
         self.patch_object(mysql_router.os.path, "exists")
@@ -769,13 +769,12 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
         mrc.name = 'foobar'
         mrc.update_config_parameters = _mock_update_config_parameters
 
-        _metadata_config = _config_data.copy()
+        _metadata_config = copy.deepcopy(_config_data)
         _metadata_config.pop('max_connections')
         _metadata_config.pop('debug')
         _params = {
             mysql_router.METADATA_CACHE_SECTION: _metadata_config,
             mysql_router.DEFAULT_SECTION: {
-                'client_ssl_mode': "PASSTHROUGH",
                 'max_total_connections': _config_data['max_connections'],
                 'pid_file': '/run/mysql/mysqlrouter-foobar.pid',
                 'unknown_config_option': 'warning',
@@ -784,18 +783,65 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
                 'level': 'INFO',
             },
         }
+
+        # Successful < 8.0.27
+        # Should use max_connections in config
+        self.cmp_pkgrevno.return_value = -1
+        _params["DEFAULT"].pop("max_total_connections")
+        _params["DEFAULT"]["max_connections"] = _config_data['max_connections']
+        _mock_update_config_parameters.reset_mock()
+        mrc.config_changed()
+        _mock_update_config_parameters.assert_called_once_with(_params)
+
+        # mysql-router pkg < 8.0.23
+        self.cmp_pkgrevno.return_value = -1
+        _mock_update_config_parameters.reset_mock()
+        self.exists.return_value = True
+        mrc.config_changed()
+        _mock_update_config_parameters.assert_called_once_with(_params)
+
         # Successful > 8.0.27
         # Should use max_total_connections in config
         self.cmp_pkgrevno.return_value = 1
+        _params["DEFAULT"].pop("max_connections")
+        _params["DEFAULT"]["max_total_connections"] = \
+            _config_data['max_connections']
 
         # Not bootstrapped yet
         self.exists.return_value = False
+        _mock_update_config_parameters.reset_mock()
         mrc.config_changed()
         _mock_update_config_parameters.assert_not_called()
 
+        # mysql-router pkg >= 8.0.23, no client_ssl_cert
+        self.cmp_pkgrevno.return_value = 1
+        self.db_router.ssl_ca.return_value = None
+        self.exists.return_value = True
+        _mock_update_config_parameters.reset_mock()
+        mrc.config_changed()
+        _mock_update_config_parameters.assert_called_once_with(_params)
+
+        # mysql-router pkg >= 8.0.23, client_ssl_cert
+        self.cmp_pkgrevno.return_value = 1
+
+        class FakeConfigParser(dict):
+            def read(*args, **kwargs):
+                pass
+
+            def write(*args, **kwargs):
+                pass
+
+        current_config = {"DEFAULT": {"client_ssl_cert": "cert"}}
+        fake_config = FakeConfigParser(current_config)
+
+        self.patch_object(mysql_router.configparser, "ConfigParser",
+                          return_value=fake_config)
+
         # With TLS PASSTHROUGH
         self.db_router.ssl_ca.return_value = '"CACERT"'
+        _params["DEFAULT"]["client_ssl_mode"] = "PASSTHROUGH"
         self.exists.return_value = True
+        _mock_update_config_parameters.reset_mock()
         mrc.config_changed()
         _mock_update_config_parameters.assert_called_once_with(_params)
 
@@ -803,15 +849,6 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
         self.db_router.ssl_ca.return_value = None
         _params["DEFAULT"]["client_ssl_mode"] = "PREFERRED"
         self.exists.return_value = True
-        _mock_update_config_parameters.reset_mock()
-        mrc.config_changed()
-        _mock_update_config_parameters.assert_called_once_with(_params)
-
-        # Successful < 8.0.27
-        # Should use max_connections in config
-        self.cmp_pkgrevno.return_value = -1
-        _params["DEFAULT"].pop("max_total_connections")
-        _params["DEFAULT"]["max_connections"] = _config_data['max_connections']
         _mock_update_config_parameters.reset_mock()
         mrc.config_changed()
         _mock_update_config_parameters.assert_called_once_with(_params)
