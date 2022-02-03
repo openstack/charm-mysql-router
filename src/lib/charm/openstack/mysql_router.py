@@ -762,12 +762,22 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
             },
         }
 
-        if self.ssl_ca:
-            ch_core.hookenv.log("TLS mode PASSTHROUGH", "DEBUG")
-            _parameters["DEFAULT"]["client_ssl_mode"] = "PASSTHROUGH"
-        else:
-            ch_core.hookenv.log("TLS mode PREFERRED", "DEBUG")
-            _parameters["DEFAULT"]["client_ssl_mode"] = "PREFERRED"
+        # mysql-router pkg version check
+        # < 8.0.23, don't add client_ssl_mode
+        if ch_core.host.cmp_pkgrevno("mysql-router", "8.0.23") >= 0:
+            config = configparser.ConfigParser()
+            config.read(self.mysqlrouter_conf)
+            if 'client_ssl_cert' in config['DEFAULT']:
+                if self.ssl_ca:
+                    ch_core.hookenv.log("TLS mode PASSTHROUGH", "DEBUG")
+                    _parameters["DEFAULT"]["client_ssl_mode"] = "PASSTHROUGH"
+                else:
+                    ch_core.hookenv.log("TLS mode PREFERRED", "DEBUG")
+                    _parameters["DEFAULT"]["client_ssl_mode"] = "PREFERRED"
+            else:
+                ch_core.hookenv.log("no client_ssl_cert, "
+                                    "delete client_ssl_mode", "DEBUG")
+                _parameters["DEFAULT"].pop("client_ssl_mode", None)
 
         if ch_core.host.cmp_pkgrevno('mysql-router', '8.0.27') >= 0:
             _parameters[DEFAULT_SECTION]["max_total_connections"] = str(
