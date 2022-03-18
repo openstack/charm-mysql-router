@@ -23,6 +23,7 @@ applications:
     num_units: 3
     options:
       source: *openstack-origin
+      cluster-name: foo
     channel: latest/edge
   keystone:
     charm: ch:keystone
