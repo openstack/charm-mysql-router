@@ -57,6 +57,21 @@ class FakeException(Exception):
         return 1
 
 
+class FakeConfigParser(dict):
+
+    def read(*args, **kwargs):
+        pass
+
+    def write(*args, **kwargs):
+        pass
+
+    def sections(self):
+        return self.keys()
+
+    def remove_section(self, section):
+        self.pop(section, None)
+
+
 class TestMySQLRouterCharm(test_utils.PatchHelper):
 
     def setUp(self):
@@ -663,13 +678,6 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
 
     def test_update_config_parameters_missing_heading(self):
         # test fix for Bug LP#1927981
-        class FakeConfigParser(dict):
-            def read(*args, **kwargs):
-                pass
-
-            def write(*args, **kwargs):
-                pass
-
         current_config = {"DEFAULT": {"client_ssl_mode": "NONE"}}
         fake_config = FakeConfigParser(current_config)
 
@@ -689,6 +697,54 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
         self.assertIn('metadata_cache:jujuCluster', fake_config)
         self.assertEqual(fake_config['metadata_cache:jujuCluster'],
                          {"thing": "a-thing"})
+
+    def test_update_config_parameters_regex(self):
+        # test fix for Bug LP#1927981
+        current_config = {
+            "DEFAULT": {"client_ssl_mode": "NONE"},
+            "metadata_cache:foo": {
+                "ttl": '5',
+                "auth_cache_ttl": '-1',
+                "auth_cache_refresh_interval": '2',
+            },
+            "routing:foo_x_rw": {
+                "test": 'yes',
+            },
+            "routing:foo_rw": {
+                "test": 'no',
+            }
+        }
+        fake_config = FakeConfigParser(current_config)
+
+        self.patch_object(mysql_router.configparser, "ConfigParser",
+                          return_value=fake_config)
+
+        # metadata_cache:jujuCluster didn't exist in the previous config so the
+        # header needs to be created (c.f. BUG LP#1927981)
+        _params = {
+            "DEFAULT": {"client_ssl_mode": "PREFERRED"},
+            mysql_router.METADATA_CACHE_SECTION: {"thing": "a-thing"},
+            mysql_router.ROUTING_RW_SECTION: {
+                "test": True,
+            },
+            mysql_router.ROUTING_X_RW_SECTION: {
+                "test": False,
+            }
+        }
+
+        mrc = mysql_router.MySQLRouterCharm()
+        # should not throw a key error.
+        mrc.update_config_parameters(_params)
+        self.assertIn('metadata_cache:foo', fake_config)
+        self.assertNotIn(mysql_router.METADATA_CACHE_SECTION, fake_config)
+        self.assertEqual(fake_config['metadata_cache:foo'],
+                         {"thing": "a-thing", "ttl": '5',
+                          "auth_cache_ttl": '-1',
+                          "auth_cache_refresh_interval": '2'})
+        self.assertEqual(fake_config['routing:foo_x_rw'],
+                         {"test": False})
+        self.assertEqual(fake_config['routing:foo_rw'],
+                         {"test": True})
 
     def test_config_changed(self):
         _config_data = {
@@ -715,8 +771,8 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
         _metadata_config = _config_data.copy()
         _metadata_config.pop('max_connections')
         _params = {
-            'metadata_cache:jujuCluster': _metadata_config,
-            'DEFAULT': {
+            mysql_router.METADATA_CACHE_SECTION: _metadata_config,
+            mysql_router.DEFAULT_SECTION: {
                 'client_ssl_mode': "PASSTHROUGH",
                 'max_connections': _config_data['max_connections'],
                 'pid_file': '/run/mysql/mysqlrouter-foobar.pid'
@@ -755,3 +811,29 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
         self.service_stop.assert_called_once_with(self.service_name)
         self.service_start.assert_called_once_with(self.service_name)
         _mock_check_mysql_connection.assert_called_once()
+
+    def test_upgrade_charm_lp1927981(self):
+        # test fix for Bug LP#1927981
+        current_config = {
+            "DEFAULT": {"client_ssl_mode": "NONE"},
+            "metadata_cache:foo": {
+                "ttl": '5',
+                "auth_cache_ttl": '-1',
+                "auth_cache_refresh_interval": '2',
+            },
+            "metadata_cache:jujuCluster": {
+                "ttl": '5',
+            },
+        }
+        fake_config = FakeConfigParser(current_config)
+
+        self.patch_object(mysql_router.charms_openstack.charm.OpenStackCharm,
+                          'upgrade_charm')
+        self.patch_object(mysql_router.configparser, "ConfigParser",
+                          return_value=fake_config)
+
+        mrc = mysql_router.MySQLRouterCharm()
+        # should not throw a key error.
+        mrc.upgrade_charm()
+        self.assertIn('metadata_cache:foo', fake_config)
+        self.assertNotIn('metadata_cache:.jujuCluster', fake_config)

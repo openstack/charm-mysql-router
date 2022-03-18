@@ -15,6 +15,7 @@
 import configparser
 import json
 import os
+import re
 import subprocess
 import tenacity
 
@@ -37,6 +38,15 @@ MYSQL_ROUTER_BOOTSTRAP_ATTEMPTED = "charm.mysqlrouter.bootstrap-attempted"
 MYSQL_ROUTER_STARTED = "charm.mysqlrouter.started"
 DB_ROUTER_AVAILABLE = "db-router.available"
 DB_ROUTER_PROXY_AVAILABLE = "db-router.available.proxy"
+
+# Section configuration search keys for setting configuration values
+# Note, mysql object names can contain alphanumeric and $ characters.
+DEFAULT_SECTION = 'DEFAULT'
+METADATA_CACHE_SECTION = r'metadata_cache:[\w$]+$'
+ROUTING_RW_SECTION = r'routing:[\w$]+_rw(?<!_x_rw)$'
+ROUTING_RO_SECTION = r'routing:[\w$]+_ro(?<!_x_ro)$'
+ROUTING_X_RO_SECTION = r'routing:[\w$]+_x_ro$'
+ROUTING_X_RW_SECTION = r'routing:[\w$]+_x_rw$'
 
 
 @charms_openstack.adapters.config_property
@@ -318,6 +328,28 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
             },
             perms=0o644,
         )
+
+    def upgrade_charm(self):
+        """Custom upgrade charm function to handle special upgrade logic."""
+        # Bug 1927981 - For mysql-innodb-clusters which were deployed with a
+        # cluster name which was not 'jujuCluster', an extra section to the
+        # mysqrouter.conf file was written which causes the mysql router
+        # service to fail to start. Remove the extraneous section at charm
+        # upgrade time.
+        config = configparser.ConfigParser()
+        config.read(self.mysqlrouter_conf)
+        sections = list(filter(lambda x: x.startswith('metadata_cache'),
+                               config.sections()))
+        if len(sections) > 1 and 'metadata_cache:jujuCluster' in sections:
+            ch_core.hookenv.log('Found multiple metadata_cache sections. '
+                                'Removing hard-coded '
+                                'metadata_cache:jujuCluster section', 'INFO')
+            config.remove_section('metadata_cache:jujuCluster')
+            ch_core.hookenv.log("Writing {}".format(self.mysqlrouter_conf))
+            with open(self.mysqlrouter_conf, 'w') as configfile:
+                config.write(configfile)
+
+        super(MySQLRouterCharm, self).upgrade_charm()
 
     def get_db_helper(self):
         """Get an instance of the MySQLDB8Helper class.
@@ -643,6 +675,13 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
             }
         }
 
+        mysqlrouter.conf file will have some headings which are targeted at
+        the mysql cluster name. Headings specified in the parameters may be a
+        regular expression for matching mysqlrouter configuration sections
+        which have variable information included in the name. Capturing
+        groups are not supported as the check is just used to see if the
+        section matches the regular expression.
+
         :param parameters: Dictionary of parameters
         :type parameters: dict
         :side effect: Writes the mysqlrouter.conf file
@@ -651,14 +690,23 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
         """
         config = configparser.ConfigParser()
         config.read(self.mysqlrouter_conf)
-        for heading in parameters.keys():
-            for param in parameters[heading].keys():
+
+        for heading, settings in parameters.items():
+            for section in config.sections():
+                if re.match(heading, section):
+                    translated = section
+                    break
+            else:
+                translated = heading
+
+            for param, value in settings.items():
                 # BUG LP#1927981 - heading may not exist during a charm upgrade
                 # Handle missing heading via direct assignment in except.
                 try:
-                    config[heading][param] = parameters[heading][param]
+                    config[translated][param] = value
                 except KeyError:
-                    config[heading] = {param: parameters[heading][param]}
+                    config[translated] = {param: value}
+
         ch_core.hookenv.log("Writing {}".format(
             self.mysqlrouter_conf))
         with open(self.mysqlrouter_conf, 'w') as configfile:
@@ -683,13 +731,13 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
             return
 
         _parameters = {
-            "metadata_cache:jujuCluster": {
+            METADATA_CACHE_SECTION: {
                 "ttl": str(self.options.ttl),
                 "auth_cache_ttl": str(self.options.auth_cache_ttl),
                 "auth_cache_refresh_interval":
                     str(self.options.auth_cache_refresh_interval),
             },
-            "DEFAULT": {
+            DEFAULT_SECTION: {
                 "pid_file": self.mysqlrouter_pid_file,
                 "max_connections": str(self.options.max_connections),
             }
