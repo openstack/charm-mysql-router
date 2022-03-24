@@ -8,7 +8,7 @@ tags:
 subordinate: true
 series:
 - focal
-- impish
+- jammy
 provides:
   shared-db:
     interface: mysql-shared
