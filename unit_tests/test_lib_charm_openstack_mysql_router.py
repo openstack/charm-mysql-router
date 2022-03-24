@@ -268,7 +268,7 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
         self.mkdir.assert_called_once_with(
             "/var/lib/mysql", group="mysql", owner="mysql", perms=0o755)
 
-        self.render.assert_called_once()
+        self.assertEqual(self.render.call_count, 2)
         self.subprocess.check_output.assert_called_once_with(
             ['systemctl', 'enable', _name],
             stderr=self.subprocess.STDOUT)

@@ -66,6 +66,11 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
         "/etc/systemd/system",
         "{}.service".format(name))
 
+    logrotate_file = os.path.join(
+        "/etc/logrotate.d",
+        "{}".format(name)
+    )
+
     services = [name]
     restart_map = {
         "/var/lib/mysql/{}/mysqlrouter.conf".format(name): services
@@ -300,6 +305,19 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
         )
         cmd = ["systemctl", "enable", self.name]
         subprocess.check_output(cmd, stderr=subprocess.STDOUT)
+
+        # Logrotate File
+        ch_core.templating.render(
+            source="logrotate",
+            template_loader=os_templating.get_loader(
+                "templates/", self.release),
+            target=self.logrotate_file,
+            context={
+                "owner": self.mysqlrouter_user,
+                "group": self.mysqlrouter_group
+            },
+            perms=0o644,
+        )
 
     def get_db_helper(self):
         """Get an instance of the MySQLDB8Helper class.

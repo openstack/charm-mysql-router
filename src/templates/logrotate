@@ -1,0 +1,9 @@
+/var/lib/mysql/*/log/*.log {
+	rotate 9
+	notifempty
+	size 10M
+	create 0644 {{ owner }} {{ group }}
+	postrotate
+	kill -HUP $(pidof mysqlrouter)
+	endscript
+}
