@@ -1,17 +1,13 @@
 - project:
     templates:
       - charm-unit-jobs-py38
-      - charm-unit-jobs-py39
+      - charm-unit-jobs-py310
     check:
       jobs:
       - focal
-      - impish:
-          voting: false
       - jammy:
           voting: false
       - full_model_ha-focal-full-ha
-      - full_model_ha-impish-full-ha:
-          voting: false
       - full_model_ha-jammy-full-ha:
           voting: false
     vars:
@@ -26,13 +22,6 @@
       - focal
     vars:
       tox_extra_args: full_model_ha:focal-full-ha
-- job:
-    name: full_model_ha-impish-full-ha
-    parent: func-target
-    dependencies:
-      - focal
-    vars:
-      tox_extra_args: full_model_ha:impish-full-ha
 - job:
     name: full_model_ha-jammy-full-ha
     parent: func-target
