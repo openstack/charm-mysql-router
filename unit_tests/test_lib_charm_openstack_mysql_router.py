@@ -776,7 +776,7 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
             mysql_router.METADATA_CACHE_SECTION: _metadata_config,
             mysql_router.DEFAULT_SECTION: {
                 'client_ssl_mode': "PASSTHROUGH",
-                'max_connections': _config_data['max_connections'],
+                'max_total_connections': _config_data['max_connections'],
                 'pid_file': '/run/mysql/mysqlrouter-foobar.pid',
                 'unknown_config_option': 'warning',
             },
@@ -784,6 +784,9 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
                 'level': 'INFO',
             },
         }
+        # Successful > 8.0.27
+        # Should use max_total_connections in config
+        self.cmp_pkgrevno.return_value = 1
 
         # Not bootstrapped yet
         self.exists.return_value = False
@@ -800,6 +803,15 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
         self.db_router.ssl_ca.return_value = None
         _params["DEFAULT"]["client_ssl_mode"] = "PREFERRED"
         self.exists.return_value = True
+        _mock_update_config_parameters.reset_mock()
+        mrc.config_changed()
+        _mock_update_config_parameters.assert_called_once_with(_params)
+
+        # Successful < 8.0.27
+        # Should use max_connections in config
+        self.cmp_pkgrevno.return_value = -1
+        _params["DEFAULT"].pop("max_total_connections")
+        _params["DEFAULT"]["max_connections"] = _config_data['max_connections']
         _mock_update_config_parameters.reset_mock()
         mrc.config_changed()
         _mock_update_config_parameters.assert_called_once_with(_params)
