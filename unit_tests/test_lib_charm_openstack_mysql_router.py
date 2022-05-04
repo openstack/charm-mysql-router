@@ -775,7 +775,8 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
             mysql_router.DEFAULT_SECTION: {
                 'client_ssl_mode': "PASSTHROUGH",
                 'max_connections': _config_data['max_connections'],
-                'pid_file': '/run/mysql/mysqlrouter-foobar.pid'
+                'pid_file': '/run/mysql/mysqlrouter-foobar.pid',
+                'unknown_config_option': 'warning',
             },
         }
 
@@ -837,3 +838,30 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
         mrc.upgrade_charm()
         self.assertIn('metadata_cache:foo', fake_config)
         self.assertNotIn('metadata_cache:.jujuCluster', fake_config)
+
+    def test_upgrade_charm_lp1971565(self):
+        # test fix for Bug LP#1971565
+        current_config = {
+            "DEFAULT": {"client_ssl_mode": "NONE"},
+            "metadata_cache:foo": {
+                "ttl": '5',
+                "auth_cache_ttl": '-1',
+                "auth_cache_refresh_interval": '2',
+            },
+            "metadata_cache:jujuCluster": {
+                "ttl": '5',
+            },
+        }
+        fake_config = FakeConfigParser(current_config)
+
+        self.patch_object(mysql_router.charms_openstack.charm.OpenStackCharm,
+                          'upgrade_charm')
+        self.patch_object(mysql_router.configparser, "ConfigParser",
+                          return_value=fake_config)
+
+        mrc = mysql_router.MySQLRouterCharm()
+        mrc.upgrade_charm()
+        self.assertIn('metadata_cache:foo', fake_config)
+        self.assertIn('unknown_config_option', fake_config['DEFAULT'])
+        self.assertEqual(fake_config['DEFAULT']['unknown_config_option'],
+                         'warning')
