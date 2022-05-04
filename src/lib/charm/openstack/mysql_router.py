@@ -331,13 +331,24 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
 
     def upgrade_charm(self):
         """Custom upgrade charm function to handle special upgrade logic."""
+        config = configparser.ConfigParser()
+        config.read(self.mysqlrouter_conf)
+
+        # On upgrade set the unknown_config_option to warning (LP: #1971565)
+        if 'unknown_config_option' not in config[DEFAULT_SECTION]:
+            ch_core.hookenv.log(f'[{DEFAULT_SECTION}].unknown_config_option '
+                                f'is not present in the configuration file, '
+                                f'so setting it to "warning"')
+            config[DEFAULT_SECTION]['unknown_config_option'] = 'warning'
+            ch_core.hookenv.log("Writing {}".format(self.mysqlrouter_conf))
+            with open(self.mysqlrouter_conf, 'w') as configfile:
+                config.write(configfile)
+
         # Bug 1927981 - For mysql-innodb-clusters which were deployed with a
         # cluster name which was not 'jujuCluster', an extra section to the
         # mysqrouter.conf file was written which causes the mysql router
         # service to fail to start. Remove the extraneous section at charm
         # upgrade time.
-        config = configparser.ConfigParser()
-        config.read(self.mysqlrouter_conf)
         sections = list(filter(lambda x: x.startswith('metadata_cache'),
                                config.sections()))
         if len(sections) > 1 and 'metadata_cache:jujuCluster' in sections:
@@ -740,6 +751,7 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
             DEFAULT_SECTION: {
                 "pid_file": self.mysqlrouter_pid_file,
                 "max_connections": str(self.options.max_connections),
+                "unknown_config_option": "warning",  # LP: #1971565
             }
         }
 
