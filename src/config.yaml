@@ -46,9 +46,13 @@ options:
         auth_cache_refresh_interval else Router won't start.
   max_connections:
     type: int
-    default: 512
+    default: 1024
     description: |
-        Maximum number of connections to allow in direction to each MySQL
+        If mysql router version < 8.0.27, this option will be set as max_connections
+        in the config. Else will be max_total_connections.
+        The max_connections is maximum number of connections to allow in direction to each MySQL
         routing sessions, with one for the RW unit and another one for the RO
-        units of the MySQL innodb cluster. Defaults to 512. A valid range is
-        between 1 and 65535.
+        units of the MySQL innodb cluster. A valid range is between 1 and 65535.
+        The max_total_connections is the maximum number of client connections handled by Router, to help
+        prevent running out of the file descriptors. A valid
+        range is between 1 and 9223372036854775807.
