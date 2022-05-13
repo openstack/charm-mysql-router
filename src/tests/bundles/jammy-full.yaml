@@ -8,16 +8,28 @@ series: &series jammy
 applications:
   keystone-mysql-router:
     charm: ../../../mysql-router.charm
+    options:
+      debug: True
   nova-mysql-router:
     charm: ../../../mysql-router.charm
+    options:
+      debug: True
   glance-mysql-router:
     charm: ../../../mysql-router.charm
+    options:
+      debug: True
   neutron-mysql-router:
     charm: ../../../mysql-router.charm
+    options:
+      debug: True
   placement-mysql-router:
     charm: ../../../mysql-router.charm
+    options:
+      debug: True
   vault-mysql-router:
     charm: ../../../mysql-router.charm
+    options:
+      debug: True
   mysql-innodb-cluster:
     charm: ch:mysql-innodb-cluster
     num_units: 3

@@ -96,6 +96,10 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
     # LP Bug #1915842
     _waiting_for_initial_communication_packet_error = 2013
 
+    # mysql.MySQLdb._exceptions.OperationalError error 2003
+    # LP Bug #1973177
+    _cannot_connect_via_ip = 2003
+
     @property
     def mysqlrouter_pid_file(self):
         """Determine the path for the mysqlrouter PID file.
@@ -771,11 +775,28 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
             ch_core.hookenv.log("Updating configuration parameters", "DEBUG")
             self.update_config_parameters(_parameters)
 
-    @tenacity.retry(wait=tenacity.wait_fixed(10),
-                    retry=tenacity.retry_if_exception_type(
-                        mysql.MySQLdb._exceptions.OperationalError),
-                    reraise=True,
-                    stop=tenacity.stop_after_attempt(5))
+    @tenacity.retry(
+        wait=tenacity.wait_fixed(10),
+        retry=tenacity.retry_if_exception_type(
+            mysql.MySQLdb._exceptions.OperationalError),
+        reraise=True,
+        stop=tenacity.stop_after_attempt(5))
+    def retry_conection_check(self):
+        """Retry database connection check."""
+        ch_core.hookenv.log("Checking connection through router", "DEBUG")
+        # Only raise an exception if it matches
+        # mysql.MySQLdb._exceptions.OperationalError error 2003 or 2013
+        # LP Bug #1915842 & #1973177
+        self.check_mysql_connection(
+            reraise_on=[
+                self._waiting_for_initial_communication_packet_error,
+                self._cannot_connect_via_ip])
+
+    @tenacity.retry(
+        retry=tenacity.retry_if_exception_type(
+            mysql.MySQLdb._exceptions.OperationalError),
+        reraise=True,
+        stop=tenacity.stop_after_attempt(5))
     def custom_restart_function(self, service_name):
         """Tenacity retry custom restart function for restart_on_change
 
@@ -791,8 +812,7 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
             "Custom restart of {}".format(service_name), "DEBUG")
         self.service_stop(service_name)
         self.service_start(service_name)
-        # Only raise an exception if it matches
-        # mysql.MySQLdb._exceptions.OperationalError error 2013
-        # LP Bug #1915842
-        self.check_mysql_connection(
-            reraise_on=[self._waiting_for_initial_communication_packet_error])
+        # In the case of the db-router service it reports itself as having
+        # started prior to being fully initialised. So when checking the
+        # connection retry a few times.
+        self.retry_conection_check()
