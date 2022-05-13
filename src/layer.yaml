@@ -12,4 +12,3 @@ config:
     - verbose
     - openstack-origin
     - use-internal-endpoints
-    - debug
