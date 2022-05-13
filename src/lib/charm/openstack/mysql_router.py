@@ -42,6 +42,7 @@ DB_ROUTER_PROXY_AVAILABLE = "db-router.available.proxy"
 # Section configuration search keys for setting configuration values
 # Note, mysql object names can contain alphanumeric and $ characters.
 DEFAULT_SECTION = 'DEFAULT'
+LOGGING_SECTION = 'logger'
 METADATA_CACHE_SECTION = r'metadata_cache:[\w$]+$'
 ROUTING_RW_SECTION = r'routing:[\w$]+_rw(?<!_x_rw)$'
 ROUTING_RO_SECTION = r'routing:[\w$]+_ro(?<!_x_ro)$'
@@ -752,7 +753,10 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
                 "pid_file": self.mysqlrouter_pid_file,
                 "max_connections": str(self.options.max_connections),
                 "unknown_config_option": "warning",  # LP: #1971565
-            }
+            },
+            LOGGING_SECTION: {
+                "level": "DEBUG" if self.options.debug else "INFO",
+            },
         }
 
         if self.ssl_ca:

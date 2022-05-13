@@ -752,6 +752,7 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
             "auth_cache_ttl": '10',
             "auth_cache_refresh_interval": '7',
             "max_connections": '1000',
+            "debug": False,
         }
 
         def _fake_config(key=None):
@@ -770,6 +771,7 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
 
         _metadata_config = _config_data.copy()
         _metadata_config.pop('max_connections')
+        _metadata_config.pop('debug')
         _params = {
             mysql_router.METADATA_CACHE_SECTION: _metadata_config,
             mysql_router.DEFAULT_SECTION: {
@@ -777,6 +779,9 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
                 'max_connections': _config_data['max_connections'],
                 'pid_file': '/run/mysql/mysqlrouter-foobar.pid',
                 'unknown_config_option': 'warning',
+            },
+            mysql_router.LOGGING_SECTION: {
+                'level': 'INFO',
             },
         }
 
