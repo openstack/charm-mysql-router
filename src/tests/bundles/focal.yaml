@@ -5,9 +5,13 @@ applications:
   keystone-mysql-router:
     series: focal
     charm: ../../../mysql-router.charm
+    options:
+      debug: True
   vault-mysql-router:
     series: focal
     charm: ../../../mysql-router.charm
+    options:
+      debug: True
   mysql-innodb-cluster:
     charm: ch:mysql-innodb-cluster
     num_units: 3
