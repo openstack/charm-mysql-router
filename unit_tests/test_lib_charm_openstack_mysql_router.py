@@ -746,6 +746,16 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
         self.assertEqual(fake_config['routing:foo_rw'],
                          {"test": True})
 
+    def test_update_config_parameters_not_bootstrapped(self):
+        self.patch_object(mysql_router.os.path, "exists",
+                          return_value=False)
+        mock_config = mock.MagicMock()
+        self.patch_object(mysql_router.configparser, "ConfigParser",
+                          return_value=mock_config)
+        mrc = mysql_router.MySQLRouterCharm()
+        mrc.update_config_parameters({})
+        mock_config.read.assert_not_called()
+
     def test_config_changed(self):
         _config_data = {
             "ttl": '5',
@@ -806,12 +816,6 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
         _params["DEFAULT"].pop("max_connections")
         _params["DEFAULT"]["max_total_connections"] = \
             _config_data['max_connections']
-
-        # Not bootstrapped yet
-        self.exists.return_value = False
-        _mock_update_config_parameters.reset_mock()
-        mrc.config_changed()
-        _mock_update_config_parameters.assert_not_called()
 
         # mysql-router pkg >= 8.0.23, no client_ssl_cert
         self.cmp_pkgrevno.return_value = 1
@@ -881,17 +885,25 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
             },
         }
         fake_config = FakeConfigParser(current_config)
+        fake_params = {}
 
         self.patch_object(mysql_router.charms_openstack.charm.OpenStackCharm,
                           'upgrade_charm')
+        self.patch_object(
+            mysql_router.MySQLRouterCharm, '_get_config_parameters',
+            return_value=fake_params)
+        mock_update_config_params = mock.MagicMock()
         self.patch_object(mysql_router.configparser, "ConfigParser",
                           return_value=fake_config)
 
         mrc = mysql_router.MySQLRouterCharm()
+        mrc.update_config_parameters = mock_update_config_params
         # should not throw a key error.
         mrc.upgrade_charm()
         self.assertIn('metadata_cache:foo', fake_config)
         self.assertNotIn('metadata_cache:.jujuCluster', fake_config)
+        mock_update_config_params.assert_called_once_with(
+            fake_params, config=fake_config)
 
     def test_upgrade_charm_lp1971565(self):
         # test fix for Bug LP#1971565
@@ -907,15 +919,23 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
             },
         }
         fake_config = FakeConfigParser(current_config)
+        fake_params = {}
 
         self.patch_object(mysql_router.charms_openstack.charm.OpenStackCharm,
                           'upgrade_charm')
+        self.patch_object(
+            mysql_router.MySQLRouterCharm, '_get_config_parameters',
+            return_value=fake_params)
+        mock_update_config_params = mock.MagicMock()
         self.patch_object(mysql_router.configparser, "ConfigParser",
                           return_value=fake_config)
 
         mrc = mysql_router.MySQLRouterCharm()
+        mrc.update_config_parameters = mock_update_config_params
         mrc.upgrade_charm()
         self.assertIn('metadata_cache:foo', fake_config)
         self.assertIn('unknown_config_option', fake_config['DEFAULT'])
         self.assertEqual(fake_config['DEFAULT']['unknown_config_option'],
                          'warning')
+        mock_update_config_params.assert_called_once_with(
+            fake_params, config=fake_config)
