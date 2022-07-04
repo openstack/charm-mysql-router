@@ -339,33 +339,37 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
         config = configparser.ConfigParser()
         config.read(self.mysqlrouter_conf)
 
-        # On upgrade set the unknown_config_option to warning (LP: #1971565)
-        if 'unknown_config_option' not in config[DEFAULT_SECTION]:
-            ch_core.hookenv.log(f'[{DEFAULT_SECTION}].unknown_config_option '
-                                f'is not present in the configuration file, '
-                                f'so setting it to "warning"')
-            config[DEFAULT_SECTION]['unknown_config_option'] = 'warning'
-            ch_core.hookenv.log("Writing {}".format(self.mysqlrouter_conf))
-            with open(self.mysqlrouter_conf, 'w') as configfile:
-                config.write(configfile)
+        with ch_core.host.restart_on_change(
+                self.restart_map,
+                restart_functions=self.restart_functions):
 
-        # Bug 1927981 - For mysql-innodb-clusters which were deployed with a
-        # cluster name which was not 'jujuCluster', an extra section to the
-        # mysqrouter.conf file was written which causes the mysql router
-        # service to fail to start. Remove the extraneous section at charm
-        # upgrade time.
-        sections = list(filter(lambda x: x.startswith('metadata_cache'),
-                               config.sections()))
-        if len(sections) > 1 and 'metadata_cache:jujuCluster' in sections:
-            ch_core.hookenv.log('Found multiple metadata_cache sections. '
-                                'Removing hard-coded '
-                                'metadata_cache:jujuCluster section', 'INFO')
-            config.remove_section('metadata_cache:jujuCluster')
-            ch_core.hookenv.log("Writing {}".format(self.mysqlrouter_conf))
-            with open(self.mysqlrouter_conf, 'w') as configfile:
-                config.write(configfile)
+            super(MySQLRouterCharm, self).upgrade_charm()
 
-        super(MySQLRouterCharm, self).upgrade_charm()
+            # On upgrade set the unknown_config_option to warning
+            # (LP: #1971565)
+            if 'unknown_config_option' not in config[DEFAULT_SECTION]:
+                msg = (f'[{DEFAULT_SECTION}].unknown_config_option '
+                       f'is not present in the configuration file, '
+                       f'so setting it to "warning"')
+                ch_core.hookenv.log(msg)
+                config[DEFAULT_SECTION]['unknown_config_option'] = 'warning'
+
+            # Bug 1927981 - For mysql-innodb-clusters which were deployed with
+            # a cluster name which was not 'jujuCluster', an extra section to
+            # the mysqlrouter.conf file was written which causes the mysql
+            # router service to fail to start. Remove the extraneous section
+            # at charm upgrade time.
+            sections = list(filter(lambda x: x.startswith('metadata_cache'),
+                                   config.sections()))
+            if len(sections) > 1 and 'metadata_cache:jujuCluster' in sections:
+                ch_core.hookenv.log('Found multiple metadata_cache sections. '
+                                    'Removing hard-coded '
+                                    'metadata_cache:jujuCluster section',
+                                    'INFO')
+                config.remove_section('metadata_cache:jujuCluster')
+
+            parameters = self._get_config_parameters()
+            self.update_config_parameters(parameters, config=config)
 
     def get_db_helper(self):
         """Get an instance of the MySQLDB8Helper class.
@@ -679,7 +683,7 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
                 db_port=self.mysqlrouter_port,
                 ssl_ca=_ssl_ca)
 
-    def update_config_parameters(self, parameters):
+    def update_config_parameters(self, parameters, config=None):
         """Update configuration parameters using ConfigParser.
 
         Update this instances mysqlrouter.conf with a dictionary set of
@@ -700,12 +704,24 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
 
         :param parameters: Dictionary of parameters
         :type parameters: dict
+        :param config: an optional existing ConfigParser object
+        :type config: configparser.ConfigParser
         :side effect: Writes the mysqlrouter.conf file
         :returns: This function is called for its side effect
         :rtype: None
         """
-        config = configparser.ConfigParser()
-        config.read(self.mysqlrouter_conf)
+        # No reason to write the file if it does not exist due to
+        # mysql-router not having been bootstrapped yet
+        if not os.path.exists(self.mysqlrouter_conf):
+            ch_core.hookenv.log(
+                "mysqlrouter.conf does not yet exist. "
+                "Skipping config-changed.", "DEBUG")
+            return
+
+        ch_core.hookenv.log("Updating configuration parameters", "DEBUG")
+        if not config:
+            config = configparser.ConfigParser()
+            config.read(self.mysqlrouter_conf)
 
         for heading, settings in parameters.items():
             for section in config.sections():
@@ -723,8 +739,7 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
                 except KeyError:
                     config[translated] = {param: value}
 
-        ch_core.hookenv.log("Writing {}".format(
-            self.mysqlrouter_conf))
+        ch_core.hookenv.log("Writing {}".format(self.mysqlrouter_conf))
         with open(self.mysqlrouter_conf, 'w') as configfile:
             config.write(configfile)
 
@@ -735,16 +750,26 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
         config via ConfigParser. We only update after the mysql-router service
         has bootstrapped.
 
-        :side effect: Calls update_config_parameter and restarts mysql-router
+        :side effect: Calls update_config_parameters and restarts mysql-router
                       if the config file has changed.
         :returns: This function is called for its side effect
         :rtype: None
         """
-        if not os.path.exists(self.mysqlrouter_conf):
+        # LP: #1980693 - config_changed may be invoked during upgrade-charm
+        # hook before the PID has been changed.
+        if 'upgrade-charm' in ch_core.hookenv.hook_name().lower():
             ch_core.hookenv.log(
-                "mysqlrouter.conf does not yet exist. "
-                "Skipping config changed.", "DEBUG")
+                "Skipping config-changed function as it is being invoked "
+                "within the upgrade-charm hook.", "DEBUG")
             return
+
+        parameters = self._get_config_parameters()
+        with ch_core.host.restart_on_change(
+                self.restart_map,
+                restart_functions=self.restart_functions):
+            self.update_config_parameters(parameters)
+
+    def _get_config_parameters(self):
 
         _parameters = {
             METADATA_CACHE_SECTION: {
@@ -788,10 +813,7 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
                 self.options.max_connections
             )
 
-        with ch_core.host.restart_on_change(
-                self.restart_map, restart_functions=self.restart_functions):
-            ch_core.hookenv.log("Updating configuration parameters", "DEBUG")
-            self.update_config_parameters(_parameters)
+        return _parameters
 
     @tenacity.retry(
         wait=tenacity.wait_fixed(10),
