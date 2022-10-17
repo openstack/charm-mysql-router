@@ -5,11 +5,9 @@
     check:
       jobs:
       - focal
-      - jammy:
-          voting: false
+      - jammy
       - full_model_ha-focal-full-ha
-      - full_model_ha-jammy-full-ha:
-          voting: false
+      - full_model_ha-jammy-full-ha
     vars:
       needs_charm_build: true
       charm_build_name: mysql-router
@@ -26,6 +24,6 @@
     name: full_model_ha-jammy-full-ha
     parent: func-target
     dependencies:
-      - focal
+      - jammy
     vars:
       tox_extra_args: full_model_ha:jammy-full-ha
