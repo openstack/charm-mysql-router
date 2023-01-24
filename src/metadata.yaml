@@ -9,6 +9,7 @@ subordinate: true
 series:
 - focal
 - jammy
+- kinetic
 provides:
   shared-db:
     interface: mysql-shared
