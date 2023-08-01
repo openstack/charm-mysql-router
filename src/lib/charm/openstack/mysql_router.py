@@ -16,6 +16,7 @@ import configparser
 import json
 import os
 import re
+import shutil
 import subprocess
 import tenacity
 
@@ -768,6 +769,21 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
                 self.restart_map,
                 restart_functions=self.restart_functions):
             self.update_config_parameters(parameters)
+
+    def config_cleanup(self):
+        """Cleanup configuration files."""
+        ch_core.hookenv.log(
+            "Cleaning up (removing) existing configuration files", "INFO")
+        if os.path.exists(self.mysqlrouter_working_dir):
+            try:
+                shutil.rmtree(self.mysqlrouter_working_dir)
+            except Exception as e:
+                ch_core.hookenv.log(
+                    f"cannot remove configuration files: {e}", "WARNING")
+        else:
+            ch_core.hookenv.log(
+                "mysqlrouter config dir does not exist. "
+                "Skipping removal.", "DEBUG")
 
     def _get_config_parameters(self):
 

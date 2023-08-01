@@ -4,12 +4,12 @@ parts:
   charm:
     charm-entrypoint: "hooks/install"
     build-packages:
-      - tox
       - git
-      - python3-dev
       - libffi-dev
       - libmysqlclient-dev
       - pkg-config
+      - python3-dev
+      - tox
     override-build: |
       apt-get install ca-certificates -y
       tox -e build-reactive
