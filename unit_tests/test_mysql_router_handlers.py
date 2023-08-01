@@ -27,7 +27,8 @@ class TestRegisteredHooks(test_utils.TestRegisteredHooks):
             "config.changed",
             "update-status",
             "upgrade-charm",
-            "charm.installed"]
+            "charm.installed",
+        ]
         hook_set = {
             "when": {
                 "db_router_request": (
@@ -52,6 +53,11 @@ class TestRegisteredHooks(test_utils.TestRegisteredHooks):
                 "start_mysqlrouter": (
                     mysql_router.MYSQL_ROUTER_STARTED,),
             },
+            "hook": {
+                "stop_charm": (
+                    "stop",
+                )
+            }
         }
         # test that the hooks were registered via the
         # reactive.mysql_router_handlers

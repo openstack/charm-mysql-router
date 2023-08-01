@@ -102,3 +102,13 @@ def proxy_shared_db_responses(shared_db, db_router):
         instance.config_changed()
         instance.proxy_db_and_user_responses(db_router, shared_db)
         instance.assess_status()
+
+
+@reactive.hook('stop')
+def stop_charm():
+    """When the charm is stopped, i.e. before the unit is deprovisioned, do
+    some cleanup.
+    """
+    with charm.provide_charm_instance() as instance:
+        instance.stop_mysqlrouter()
+        instance.config_cleanup()

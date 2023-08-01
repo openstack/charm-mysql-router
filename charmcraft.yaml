@@ -3,10 +3,10 @@ type: charm
 parts:
   charm:
     build-packages:
-      - tox
       - git
-      - python3-dev
       - libmysqlclient-dev
+      - python3-dev
+      - tox
     override-build: |
       apt-get install ca-certificates -y
       tox -e build-reactive
