@@ -54,7 +54,7 @@
       "url": "https://github.com/openstack/charm-interface-mysql-router.git",
       "vcs": null,
       "branch": "refs/heads/master",
-      "commit": "21586be61f07897dba96a8a409966016f0f2a706"
+      "commit": "77dc778e6060a9bcdc49490c3e782b2204ba7454"
     },
     {
       "type": "python_module",
