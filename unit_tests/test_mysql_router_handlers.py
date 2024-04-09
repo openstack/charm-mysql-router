@@ -25,7 +25,6 @@ class TestRegisteredHooks(test_utils.TestRegisteredHooks):
     def test_hooks(self):
         defaults = [
             "config.changed",
-            "update-status",
             "upgrade-charm",
             "charm.installed",
         ]
@@ -56,7 +55,10 @@ class TestRegisteredHooks(test_utils.TestRegisteredHooks):
             "hook": {
                 "stop_charm": (
                     "stop",
-                )
+                ),
+                "update_status": (
+                    "update-status",
+                ),
             }
         }
         # test that the hooks were registered via the
