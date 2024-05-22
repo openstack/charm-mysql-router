@@ -479,7 +479,20 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
 
         return None, None
 
-    def bootstrap_mysqlrouter(self):
+    def validate_configuration(self):
+        """Validate Configuration
+
+        Check if mysql router configuration file is less than 1024 bytes.
+        If so, then the configuration file is probably damaged, and then
+        re-run the `bootstrap_mysqlrouter()` function with True to force
+        it.
+        """
+
+        conf_size = os.path.getsize(self.mysqlrouter_conf)
+        if conf_size <= 1024:
+            self.bootstrap_mysqlrouter(True)
+
+    def bootstrap_mysqlrouter(self, force=False):
         """Bootstrap MySQL Router.
 
         Execute the mysqlrouter bootstrap command. MySQL Router bootstraps into
@@ -494,7 +507,7 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
         :rtype: None
         """
 
-        if reactive.flags.is_flag_set(MYSQL_ROUTER_BOOTSTRAPPED):
+        if not force and reactive.flags.is_flag_set(MYSQL_ROUTER_BOOTSTRAPPED):
             ch_core.hookenv.log(
                 "Bootstrap mysqlrouter is being called after we set the "
                 "bootstrapped flag: {}. This may require manual intervention,"
@@ -522,8 +535,19 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
 
         # If we have attempted to bootstrap before but unsuccessfully,
         # use the force option to avoid LP Bug#1919560
-        if reactive.flags.is_flag_set(MYSQL_ROUTER_BOOTSTRAP_ATTEMPTED):
+        is_bootstrap_attempted = reactive.flags.is_flag_set(
+            MYSQL_ROUTER_BOOTSTRAP_ATTEMPTED)
+        if is_bootstrap_attempted or force:
             cmd.append("--force")
+            # clear configuration before force bootstrap
+            # because if there are some regex string, it fails
+            try:
+                with open(self.mysqlrouter_conf, "wt") as f:
+                    f.write("[DEFAULT]\n")
+            except Exception:
+                ch_core.hookenv.log(
+                    "ignored, because the bootstrap will overwrite the file.")
+                pass
 
         # Set and attempt the bootstrap
         reactive.flags.set_flag(MYSQL_ROUTER_BOOTSTRAP_ATTEMPTED)
