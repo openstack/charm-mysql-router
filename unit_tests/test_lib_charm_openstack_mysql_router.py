@@ -484,62 +484,6 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
         self.clear_flag.assert_called_once_with(
             mysql_router.MYSQL_ROUTER_BOOTSTRAP_ATTEMPTED)
 
-    def test_bootstrap_mysqlrouter_force(self):
-        _json_addr = '"10.10.10.60"'
-        _json_pass = '"clusterpass"'
-        _pass = json.loads(_json_pass)
-        _addr = json.loads(_json_addr)
-        _user = "mysql"
-        _port = "3006"
-        self.patch_object(mysql_router.reactive.flags, "is_flag_set")
-        self.endpoint_from_flag.return_value = self.db_router
-        self.db_router.password.return_value = _json_pass
-        self.db_router.db_host.return_value = _json_addr
-        self.is_flag_set.return_value = False
-
-        mrc = mysql_router.MySQLRouterCharm()
-        mrc.options.system_user = _user
-        mrc.options.base_port = _port
-
-        _relations = ["relid"]
-
-        self.patch_object(mysql_router.ch_core.hookenv, "relation_ids")
-        self.relation_ids.return_value = _relations
-
-        _related_units = ["relunits"]
-
-        self.patch_object(mysql_router.ch_core.hookenv, "related_units")
-        self.related_units.return_value = _related_units
-
-        _config_data = {
-            "mysqlrouter_password": json.dumps(_pass),
-            "db_host": json.dumps(_addr),
-        }
-
-        self.patch_object(mysql_router.ch_core.hookenv, "relation_get")
-        self.relation_get.return_value = _config_data
-
-        self.cmp_pkgrevno.return_value = 1
-        self.is_flag_set.side_effect = [False, True]
-        self.subprocess.check_output.side_effect = None
-        mrc.bootstrap_mysqlrouter(True)
-        self.subprocess.check_output.assert_called_once_with(
-            [mrc.mysqlrouter_bin, "--user", _user, "--name", mrc.name,
-             "--bootstrap", "{}:{}@{}"
-             .format(mrc.db_router_user, _pass, _addr),
-             "--directory", mrc.mysqlrouter_working_dir,
-             "--conf-use-sockets",
-             "--conf-bind-address", mrc.shared_db_address,
-             "--report-host", mrc.db_router_address,
-             "--conf-base-port", _port,
-             "--disable-rest", "--force"],
-            stderr=self.stdout)
-        self.set_flag.assert_has_calls([
-            mock.call(mysql_router.MYSQL_ROUTER_BOOTSTRAP_ATTEMPTED),
-            mock.call(mysql_router.MYSQL_ROUTER_BOOTSTRAPPED)])
-        self.clear_flag.assert_called_once_with(
-            mysql_router.MYSQL_ROUTER_BOOTSTRAP_ATTEMPTED)
-
     def test_start_mysqlrouter(self):
         self.patch_object(mysql_router.ch_core.host, "service_start")
         _name = "keystone-mysql-router"
