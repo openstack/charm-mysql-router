@@ -1,15 +1,13 @@
 local_overlay_enabled: False
 
-series: focal
+series: noble
 applications:
   keystone-mysql-router:
-    series: focal
-    charm: ../../../mysql-router.charm
+    charm: ../../../mysql-router_amd64.charm
     options:
       debug: True
   vault-mysql-router:
-    series: focal
-    charm: ../../../mysql-router.charm
+    charm: ../../../mysql-router_amd64.charm
     options:
       debug: True
   mysql-innodb-cluster:
@@ -19,11 +17,11 @@ applications:
   keystone:
     charm: ch:keystone
     num_units: 1
-    channel: yoga/edge
+    channel: latest/edge
   vault:
     charm: ch:vault
     num_units: 1
-    channel: 1.7/edge
+    channel: latest/edge
 relations:
   - - vault:certificates
     - mysql-innodb-cluster:certificates

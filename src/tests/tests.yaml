@@ -22,21 +22,21 @@ tests:
     - zaza.openstack.charm_tests.hacluster.tests.HaclusterScaleBackAndForthTest
 
 gate_bundles:
-- full_model_ha: focal-full-ha
+- full_model_ha: noble-full-ha
 
 dev_bundles:
-- full_model_ha: jammy-full-ha
+- full_model_ha: noble-full-ha
 
 smoke_bundles:
-- full_model_ha: focal-full-ha
+- full_model_ha: noble-full-ha
 
 tests_options:
   hacluster:
     principle-app-name: keystone
     hacluster-charm-name: hacluster
   force_deploy:
-   - jammy
-   - jammy-full-ha
+   - noble
+   - noble-full-ha
 
 target_deploy_status:
   neutron-api-plugin-ovn:

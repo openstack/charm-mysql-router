@@ -3,6 +3,8 @@ mysqlclient
 tenacity<8.0.0
 poetry-core
 
+git+https://github.com/wolsen/charms.reactive.git@fix-entry-points#egg=charms.reactive
+
 git+https://github.com/juju/charm-helpers.git#egg=charmhelpers
 
 git+https://github.com/openstack/charms.openstack.git#egg=charms.openstack
