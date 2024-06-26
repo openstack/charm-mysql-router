@@ -11,7 +11,6 @@ charms_openstack.bus.discover()
 charm.use_defaults(
     'charm.installed',
     'config.changed',
-    'update-status',
     'upgrade-charm')
 
 
@@ -99,6 +98,7 @@ def proxy_shared_db_responses(shared_db, db_router):
     :type db_router_interface: MySQLRouterRequires object
     """
     with charm.provide_charm_instance() as instance:
+        instance.validate_configuration()
         instance.config_changed()
         instance.proxy_db_and_user_responses(db_router, shared_db)
         instance.assess_status()
@@ -112,3 +112,10 @@ def stop_charm():
     with charm.provide_charm_instance() as instance:
         instance.stop_mysqlrouter()
         instance.config_cleanup()
+
+
+@reactive.hook('update-status')
+def update_status():
+    with charm.provide_charm_instance() as instance:
+        instance.validate_configuration()
+        instance.assess_status()
