@@ -56,3 +56,13 @@ options:
         The max_total_connections is the maximum number of client connections handled by Router, to help
         prevent running out of the file descriptors. A valid
         range is between 1 and 9223372036854775807.
+  use_gr_notifications:
+    type: boolean
+    default: false
+    description: |
+        Enables Group Replication notifications. When enabled, the mysql router is
+        asynchronously notified about most cluster changes. This allows for a higher ttl
+        value, as periodic metadata refreshes serve as an additional safeguard rather
+        than the primary method of keeping cluster state information up to date.
+        When disabled, a low ttl value (such as 0.5s, the default) is recommended
+        to reduce the cache misalignment window between routers and mysql clusters.
