@@ -822,6 +822,8 @@ class MySQLRouterCharm(charms_openstack.charm.OpenStackCharm):
                 "auth_cache_ttl": str(self.options.auth_cache_ttl),
                 "auth_cache_refresh_interval":
                     str(self.options.auth_cache_refresh_interval),
+                "use_gr_notifications":
+                    "1" if self.options.use_gr_notifications else "0"
             },
             DEFAULT_SECTION: {
                 "pid_file": self.mysqlrouter_pid_file,

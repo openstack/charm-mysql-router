@@ -858,12 +858,52 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
         mrc.update_config_parameters({})
         mock_config.read.assert_not_called()
 
+    def test_get_config_parameters(self):
+        self.patch_object(mysql_router.configparser, "ConfigParser")
+        self.endpoint_from_flag.return_value = self.db_router
+        self.db_router.ssl_ca.return_value = '"CACERT"'
+
+        fake_config = FakeConfigParser({"DEFAULT": {"client_ssl_cert": "1"}})
+        self.ConfigParser.return_value = fake_config
+
+        mrc = mysql_router.MySQLRouterCharm()
+        mrc.options.ttl = 5
+        mrc.options.auth_cache_ttl = 10
+        mrc.options.auth_cache_refresh_interval = 7
+        mrc.options.use_gr_notifications = False
+        mrc.options.debug = False
+        mrc.options.max_connections = 1000
+
+        # >= 8.0.23 enables TLS mode detection; >= 8.0.27 uses
+        # max_total_connections.
+        self.cmp_pkgrevno.side_effect = [1, 1]
+        params = mrc._get_config_parameters()
+
+        self.assertEqual(params[mysql_router.METADATA_CACHE_SECTION], {
+            "ttl": "5",
+            "auth_cache_ttl": "10",
+            "auth_cache_refresh_interval": "7",
+            "use_gr_notifications": "0",
+        })
+        self.assertEqual(params[mysql_router.LOGGING_SECTION], {
+            "level": "INFO",
+        })
+        self.assertEqual(
+            params[mysql_router.DEFAULT_SECTION]["client_ssl_mode"],
+            "PASSTHROUGH")
+        self.assertEqual(
+            params[mysql_router.DEFAULT_SECTION]["max_total_connections"],
+            "1000")
+        self.assertNotIn(
+            "max_connections", params[mysql_router.DEFAULT_SECTION])
+
     def test_config_changed(self):
         _config_data = {
             "ttl": '5',
             "auth_cache_ttl": '10',
             "auth_cache_refresh_interval": '7',
             "max_connections": '1000',
+            "use_gr_notifications": False,
             "debug": False,
         }
 
@@ -884,6 +924,7 @@ class TestMySQLRouterCharm(test_utils.PatchHelper):
         _metadata_config = copy.deepcopy(_config_data)
         _metadata_config.pop('max_connections')
         _metadata_config.pop('debug')
+        _metadata_config['use_gr_notifications'] = '0'
         _params = {
             mysql_router.METADATA_CACHE_SECTION: _metadata_config,
             mysql_router.DEFAULT_SECTION: {
