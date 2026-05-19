@@ -4,12 +4,12 @@ series: focal
 applications:
   keystone-mysql-router:
     series: focal
-    charm: ../../../mysql-router.charm
+    charm: ../../../mysql-router_ubuntu@20.04-amd64.charm
     options:
       debug: True
   vault-mysql-router:
     series: focal
-    charm: ../../../mysql-router.charm
+    charm: ../../../mysql-router_ubuntu@20.04-amd64.charm
     options:
       debug: True
   mysql-innodb-cluster:
