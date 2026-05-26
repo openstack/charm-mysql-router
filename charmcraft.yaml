@@ -4,8 +4,9 @@ parts:
   charm:
     plugin: reactive
     reactive-charm-build-arguments:
-    - --binary-wheels-from-source
-    - --verbose
+      - --verbose
+      - --binary-wheels-from-source
+      - --use-lock-file-branches
     build-packages:
     - tox
     - git
@@ -19,6 +20,7 @@ parts:
     build-environment:
       - CHARM_INTERFACES_DIR: $CRAFT_PROJECT_DIR/interfaces/
       - CHARM_LAYERS_DIR: $CRAFT_PROJECT_DIR/layers/
+
 platforms:
   ubuntu@24.04:amd64:
   ubuntu@24.04:arm64:
