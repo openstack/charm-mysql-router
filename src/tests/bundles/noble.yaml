@@ -3,11 +3,11 @@ local_overlay_enabled: False
 series: noble
 applications:
   keystone-mysql-router:
-    charm: ../../../mysql-router_amd64.charm
+    charm: ../../../mysql-router_ubuntu@24.04-amd64.charm
     options:
       debug: True
   vault-mysql-router:
-    charm: ../../../mysql-router_amd64.charm
+    charm: ../../../mysql-router_ubuntu@24.04-amd64.charm
     options:
       debug: True
   mysql-innodb-cluster:
